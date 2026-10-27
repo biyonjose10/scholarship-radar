@@ -3,16 +3,16 @@
 Resume order: `../PLAN.md` → this file → `features.json` → `git log`.
 One entry per working session or verified feature: time (IST), what changed, evidence.
 
-## 2026-10-28 03:00 IST
+## 2026-10-28 02:45 IST
 - Idea picked by user. PLAN.md + features.json written. No code yet; waiting for plan approval and the Token Factory key in `../.env`.
 - Next: smoke test (A01), repo + MIT + .gitignore, blank Vercel deploy with protection off.
 
-## 2026-10-28 ~03:30 IST
+## 2026-10-28 ~02:55 IST
 - Scaffold pushed (private repo biyonjose10/scholarship-radar). Vercel project `unclaimed` deployed: https://unclaimed-nine.vercel.app
 - Deployment Protection (SSO) disabled via `vercel project protection disable unclaimed --sso`; `curl` returns HTTP 200 with no redirect; built-in browser (not logged in to Vercel) shows the placeholder page.
 - Waiting on: NEBIUS_API_KEY / TAVILY_API_KEY in ../.env (user is setting up Token Factory billing). Then `npm run smoke` (A01).
 
-## 2026-10-28 ~04:00–05:30 IST (overnight build; Nebius key not yet available)
+## 2026-10-28 ~02:55–03:15 IST (overnight build; Nebius key not yet available)
 Built: Tavily search/extract with source ranking (`src/lib/tavily.ts`), rule checker + source verifier
 (`checker.ts`, `text.ts`), Nemotron client (`nebius.ts`), Scout/Reader/Judge prompts (`prompts.ts`),
 full pipeline (`pipeline.ts`), SSE API (`/api/run`), spend guard, passbook ledger UI with live timeline,
