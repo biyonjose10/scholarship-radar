@@ -1,5 +1,5 @@
 // POST /api/run — runs the agent for one profile and streams its steps as Server-Sent Events.
-import { runPipeline } from "@/lib/pipeline";
+import { runPipeline, todayIst } from "@/lib/pipeline";
 import { admit } from "@/lib/guard";
 import { hasNebiusKey } from "@/lib/nebius";
 import type { CourseLevel, Category, Gender, KaGroup, Profile, RunEvent } from "@/lib/types";
@@ -43,6 +43,11 @@ function sse(events: RunEvent[]): Response {
 export async function POST(req: Request): Promise<Response> {
   const profile = parseProfile(await req.json().catch(() => null));
   if (!profile) return Response.json({ error: "Please fill in every field." }, { status: 400 });
+
+  if (process.env.NODE_ENV === "development" && process.env.DEV_FIXTURE === "1") {
+    const { fixtureEvents } = await import("@/lib/devFixture");
+    return sse(fixtureEvents(profile, todayIst()));
+  }
 
   if (!hasNebiusKey() || !process.env.TAVILY_API_KEY) {
     return sse([{ type: "error", message: "The model service isn't configured on this server yet." }, { type: "done" }]);
