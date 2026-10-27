@@ -20,7 +20,7 @@ const queries = process.argv.slice(2).length
 
 const log = (c: unknown) => console.log(JSON.stringify(c));
 const hits = (await Promise.all(queries.map((q) => search(q, "search", log)))).flat();
-const ranked = rankSources(hits);
+const ranked = rankSources(hits, "Karnataka");
 console.log(`\n${ranked.length} unique sources:`);
 for (const h of ranked) console.log(`  [${h.kind}] ${h.url}`);
 const top = ranked.slice(0, 10).map((h) => h.url);

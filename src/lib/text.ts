@@ -24,7 +24,9 @@ export function quoteInText(quote: string | null | undefined, normalizedPage: st
   return normalizedPage.includes(q);
 }
 
-const SIGNALS = /eligib|income|last date|deadline|amount|scholarship|lakh|documents?|criteria|apply|fee|marks|percentage|category|renewal/gi;
+// English plus the Kannada words official Karnataka pages use: ವಿದ್ಯಾರ್ಥಿವೇತನ (scholarship),
+// ಕೊನೆಯ ದಿನಾಂಕ (last date), ಅರ್ಹತೆ (eligibility), ಆದಾಯ (income), ಶುಲ್ಕ (fee).
+const SIGNALS = /eligib|income|last date|deadline|amount|scholarship|lakh|documents?|criteria|apply|fee|marks|percentage|category|renewal|ವಿದ್ಯಾರ್ಥಿವೇತನ|ವಿದ್ಯಾರ್ಧಿವೇತನ|ಕೊನೆಯ ದಿನಾಂಕ|ಅರ್ಹತೆ|ಆದಾಯ|ಶುಲ್ಕ/gi;
 
 // Count of scholarship words: pages with none are navigation shells (JS-rendered portals).
 export function signalScore(text: string): number {

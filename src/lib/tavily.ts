@@ -71,19 +71,51 @@ export function classifySource(url: string): SourceKind | "blocked" {
   return "other";
 }
 
-const KIND_RANK: Record<SourceKind, number> = { official: 0, foundation: 1, aggregator: 2, other: 3 };
+// Central-government hosts whose schemes apply in every state.
+const NATIONAL_HOSTS = [
+  "scholarships.gov.in", "aicte.gov.in", "aicte-india.org", "education.gov.in", "socialjustice.gov.in",
+  "minorityaffairs.gov.in", "tribal.nic.in", "myscheme.gov.in", "ugc.gov.in", "ugc.ac.in", "pib.gov.in", "india.gov.in",
+];
 
-// Official first, then foundations, then aggregators; within a kind, Tavily's own score.
-export function rankSources(hits: SearchHit[]): SearchHit[] {
+// State names and the short codes their government hosts use (e.g. mn.gov.in = Manipur).
+const STATE_MARKERS: Record<string, string[]> = {
+  "Andhra Pradesh": ["andhra", "ap.gov.in", "apgov"], "Arunachal Pradesh": ["arunachal"], Assam: ["assam"], Bihar: ["bihar"],
+  Chhattisgarh: ["chhattisgarh", "cg.gov.in"], Goa: ["goa.gov.in", "goa"], Gujarat: ["gujarat"], Haryana: ["haryana"],
+  "Himachal Pradesh": ["himachal", "hp.gov.in"], Jharkhand: ["jharkhand"], Karnataka: ["karnataka", "kar.nic.in"],
+  Kerala: ["kerala"], "Madhya Pradesh": ["madhya", "mp.gov.in", "mponline"], Maharashtra: ["maharashtra", "mahadbt"],
+  Manipur: ["manipur", "mn.gov.in"], Meghalaya: ["meghalaya"], Mizoram: ["mizoram"], Nagaland: ["nagaland"],
+  Odisha: ["odisha"], Punjab: ["punjab"], Rajasthan: ["rajasthan"], Sikkim: ["sikkim"], "Tamil Nadu": ["tamilnadu", "tn.gov.in"],
+  Telangana: ["telangana", "ts.gov.in", "tg.gov.in"], Tripura: ["tripura"], "Uttar Pradesh": ["uttarpradesh", "up.gov.in", "upgov"],
+  Uttarakhand: ["uttarakhand", "uk.gov.in"], "West Bengal": ["westbengal", "wb.gov.in", "wbgov"], Delhi: ["delhi"],
+};
+
+function mentionsState(url: string, state: string): boolean {
+  const u = url.toLowerCase().replace(/[\s_-]+/g, "");
+  return (STATE_MARKERS[state] ?? [state.toLowerCase().replace(/\s+/g, "")]).some((m) => u.includes(m.replace(/[\s_-]+/g, "")));
+}
+
+function otherState(url: string, state: string): boolean {
+  return Object.keys(STATE_MARKERS).some((s) => s !== state && mentionsState(url, s));
+}
+
+// Order: the student's own state government, then central government, then funders,
+// then secondary sites. Pages about another state's schemes are dropped.
+export function rankSources(hits: SearchHit[], state: string): SearchHit[] {
   const seen = new Set<string>();
+  const rank = (h: SearchHit): number => {
+    if (h.kind === "official") return mentionsState(h.url, state) ? 0 : 1;
+    return { foundation: 2, aggregator: 3, other: 4 }[h.kind];
+  };
   return hits
     .filter((h) => {
       const key = h.url.split("#")[0].replace(/\/$/, "");
       if (seen.has(key)) return false;
       seen.add(key);
+      if (otherState(h.url, state)) return false;
+      if (h.kind === "official" && !mentionsState(h.url, state) && !matches(hostOf(h.url), NATIONAL_HOSTS)) return false;
       return true;
     })
-    .sort((a, b) => KIND_RANK[a.kind] - KIND_RANK[b.kind] || b.score - a.score);
+    .sort((a, b) => rank(a) - rank(b) || b.score - a.score);
 }
 
 function apiKey(): string {

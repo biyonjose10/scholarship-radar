@@ -79,11 +79,13 @@ Rules:
 2. Income in rupees as a number: "₹2.5 lakh" = 250000, "₹1 lakh" = 100000, "8 LPA" = 800000.
 3. If income limits differ by group (e.g. Karnataka Category-I vs 2A/3A/3B), write one income_max per group with forCategories.
 4. If a scheme has tiers with different benefits, write one scholarship per tier.
-5. Deadline: the last date to apply in the current cycle, as YYYY-MM-DD, with the exact quote. If the page gives dates by department, pick the department matching the scheme. If none, date null.
+5. Deadline: the last date to apply in the current cycle, as YYYY-MM-DD, with the exact quote. Indian pages write dates day-first: "31/10/2026" and "10.07.2025" are 31 October 2026 and 10 July 2025. If the page gives dates by department, pick the department matching the scheme. If none, date null.
 6. cycle: the academic year the page's dates belong to, e.g. "2026-27"; null if not stated.
 7. amount.value: annual rupees if the page says so; null if it is fee reimbursement or unclear (put the wording in "text").
 8. Only include scholarships the student could plausibly be eligible for: college-level (skip school-only), their state or all-India. At most 6. If the page has none, return {"scholarships": []}.
-9. Rules you cannot quote go in "other" with the closest quote, or are left out. Do not invent anything.`;
+9. Rules you cannot quote go in "other" with the closest quote, or are left out. Do not invent anything.
+10. Pages may be partly in Kannada or another Indian language. Read them, write names and reasons in English, but copy each quote exactly in the page's original language and script. Known Karnataka departments: Social Welfare (SC), Tribal Welfare (ST), Backward Classes Welfare (OBC), Minorities Welfare, Technical Education.
+11. A notice that applications "for the year 2024-25" closed on some date is an old cycle: set cycle "2024-25".`;
 
 export function readerUser(p: Profile, url: string, text: string): string {
   return `Student (only to judge relevance, not eligibility):\n${describeProfile(p)}\n\nSource URL: ${url}\n\nPage text:\n"""\n${text}\n"""`;

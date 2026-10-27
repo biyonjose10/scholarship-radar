@@ -110,3 +110,18 @@ test("focusText drops menus and keeps eligibility paragraphs", () => {
   assert.ok(!out.includes("Link 49"));
   assert.ok(out.length <= 2100);
 });
+
+test("Kannada quotes from the official SSP portal are verified as-is", () => {
+  const ssp = `##### Backward Classes Welfare Department 24 Days left
+ಹಿಂದುಳಿದ ಕಲ್ಯಾಣ ಇಲಾಖೆಯ ಮೆಟ್ರಿಕ್ ನಂತರದ ವಿದ್ಯಾರ್ಥಿವೇತನಕ್ಕೆ ಅರ್ಜಿ ಸಲ್ಲಿಸಲು ಕೊನೆಯ ದಿನಾಂಕ: 31/10/2026`;
+  const s: Scholarship = {
+    ...bcw,
+    sourceKind: "official",
+    deadline: { date: "2026-10-31", text: "31/10/2026", quote: "ವಿದ್ಯಾರ್ಥಿವೇತನಕ್ಕೆ ಅರ್ಜಿ ಸಲ್ಲಿಸಲು ಕೊನೆಯ ದಿನಾಂಕ: 31/10/2026" },
+    criteria: [],
+  };
+  const r = checkScholarship(kavya, s, ssp, TODAY);
+  assert.equal(r.deadlineStatus, "closing_soon");
+  assert.equal(r.daysLeft, 3);
+  assert.ok(!r.flags.some((f) => f.includes("secondary")));
+});

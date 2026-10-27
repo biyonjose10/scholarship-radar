@@ -1,6 +1,7 @@
 // DEVELOPMENT ONLY. Replays a labelled sample run so the interface can be laid out
 // before model access exists. The API route refuses to use it in production builds.
-// The scholarships are hand-written from real 2026-27 pages; the checker output is real.
+// The scholarships are hand-written, modelled on real 2026-27 pages (the BCW 31/10/2026 date matches
+// ssp.karnataka.gov.in on 28 Oct 2026); the checker and verifier output is real.
 import type { Profile, RunEvent, Scholarship } from "./types";
 import { baseOrder, checkScholarship } from "./checker";
 
@@ -8,7 +9,7 @@ const PAGE = `
 Application deadlines fall for Karnataka’s SSP scholarship 2026-27 across various departments between September 30, 2026, and January 31, 2027.
 Post-Matric Scholarship for Backward Classes: Family income up to ₹2.5 lakh for Category I; up to ₹1 lakh for Categories 2A, 3A and 3B.
 Post-Matric Scholarship for Minorities Enrolled in Class 11, 12, graduation, post-graduation or a technical/vocational course. Family income up to ₹2.5 lakh from all sources.
-Backward Classes Welfare: December 31, 2026
+Backward Classes Welfare Department: last date 31/10/2026
 Minorities Welfare: November 15, 2026
 AICTE Pragati Scholarship for girls admitted to first year of degree or diploma, or second year through lateral entry. Family income not more than ₹8 lakh per annum. Scholarship of ₹50,000 per annum. Last date: 31 October 2026.
 `;
@@ -22,7 +23,7 @@ const SAMPLE: Scholarship[] = [
     name: "Post-Matric Scholarship for Backward Classes",
     provider: "Backward Classes Welfare Department, Karnataka",
     amount: { value: null, text: "Fee reimbursement + maintenance", period: "per-year" },
-    deadline: { date: "2026-12-31", text: "31 Dec 2026", quote: "Backward Classes Welfare: December 31, 2026" },
+    deadline: { date: "2026-10-31", text: "31 Oct 2026", quote: "Backward Classes Welfare Department: last date 31/10/2026" },
     criteria: [
       { kind: "states", values: ["Karnataka"], quote: "Karnataka’s SSP scholarship 2026-27" },
       { kind: "categories", values: ["Cat-1", "2A", "3A", "3B"], quote: "up to ₹1 lakh for Categories 2A, 3A and 3B" },

@@ -101,7 +101,7 @@ export async function runPipeline(profile: Profile, emit: Emit): Promise<void> {
       ...plan.official.map((q) => search(q, "search", onTool, { includeDomains: OFFICIAL_DOMAINS, maxResults: 5 })),
     ])
   ).flat();
-  const ranked = rankSources(hits);
+  const ranked = rankSources(hits, profile.state);
   if (ranked.length === 0) {
     emit({ type: "step", step: "search", status: "failed", actor: "Tavily Search", detail: "No results" });
     emit({ type: "error", message: "The web search returned nothing. Try again in a minute." });
