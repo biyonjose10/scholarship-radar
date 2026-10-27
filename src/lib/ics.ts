@@ -8,7 +8,13 @@ function esc(s: string): string {
 
 function fold(line: string): string {
   const out: string[] = [];
-  for (let i = 0; i < line.length; i += 72) out.push((i ? " " : "") + line.slice(i, i + 72));
+  let i = 0;
+  while (i < line.length) {
+    let end = Math.min(i + 72, line.length);
+    if (end < line.length && line[end - 1] === "\\") end--; // never split an escape sequence
+    out.push((i ? " " : "") + line.slice(i, end));
+    i = end;
+  }
   return out.join("\r\n");
 }
 
