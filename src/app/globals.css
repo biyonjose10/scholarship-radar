@@ -1,0 +1,31 @@
+@import "tailwindcss";
+
+/* Design tokens: "passbook and rubber stamp" (see ../PLAN.md) */
+:root {
+  --ink: #10231c;
+  --page: #eef2ec;
+  --paper: #ffffff;
+  --rupee: #1e7a4c;
+  --stamp: #5b3fa0;
+  --marigold: #e8a200;
+  --rule: #c9d3cc;
+}
+
+@theme inline {
+  --color-ink: var(--ink);
+  --color-page: var(--page);
+  --color-paper: var(--paper);
+  --color-rupee: var(--rupee);
+  --color-stamp: var(--stamp);
+  --color-marigold: var(--marigold);
+  --color-rule: var(--rule);
+  --font-display: var(--font-display);
+  --font-sans: var(--font-body);
+  --font-mono: var(--font-figures);
+}
+
+body {
+  background: var(--page);
+  color: var(--ink);
+  font-family: var(--font-body), system-ui, sans-serif;
+}

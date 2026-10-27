@@ -1,0 +1,24 @@
+{
+  "entry": "A — Scholarship Radar (public name: Unclaimed)",
+  "rule": "passes flips to true only after verifying in the running app; record the evidence (command + output or screenshot path) in progress.md",
+  "features": [
+    {"id": "A01", "tier": "must", "description": "Token Factory smoke test: GET /v1/models lists the four Nemotron IDs; one Lightning chat call returns text", "test": "run the smoke script; output shows the model list and a reply, the key is never printed", "passes": false},
+    {"id": "A02", "tier": "must", "description": "Profile form (state, course, year, category, income band, marks %, gender, disability) + 3 fictional demo personas", "test": "click each persona; the form fills; submitting starts a run", "passes": false},
+    {"id": "A03", "tier": "must", "description": "Scout (Nemotron 3.5 Lightning) writes 6-10 targeted search queries from the profile, shown in the timeline", "test": "run a persona; the timeline shows the Lightning step and its queries", "passes": false},
+    {"id": "A04", "tier": "must", "description": "Tavily Search finds current-cycle pages, official domains ranked first", "test": "the timeline lists result URLs; at least half are .gov.in/.nic.in/foundation sites for the Karnataka persona", "passes": false},
+    {"id": "A05", "tier": "must", "description": "Tavily Extract pulls the full text of the top pages", "test": "the log shows extract calls; extracted character counts are above 0", "passes": false},
+    {"id": "A06", "tier": "must", "description": "Reader (Nemotron 3 Super, JSON mode) returns structured rules per scholarship, each with source_url and source_quote", "test": "inspect the JSON in the log panel; every rule has a quote that appears in the extracted text", "passes": false},
+    {"id": "A07", "tier": "must", "description": "Checker in plain code marks each criterion tick / cross / unknown against the profile", "test": "unit test with a hand-written rule + profile; in the UI, change income above the limit and the row flips to not eligible", "passes": false},
+    {"id": "A08", "tier": "must", "description": "Verifier flags deadlines from an old cycle or without a quote as 'check portal'", "test": "a deliberately old-cycle page is flagged, not shown as a live deadline", "passes": false},
+    {"id": "A09", "tier": "must", "description": "Judge (Nemotron 3 Ultra) ranks scholarships and writes the action plan incl. document lead times", "test": "the log shows an Ultra call with a Token Factory request ID; the plan appears under the ledger", "passes": false},
+    {"id": "A10", "tier": "must", "description": "Passbook-ledger results UI: total ₹, closing-soon marker, rule ticks with quotes, design tokens from PLAN.md", "test": "visual check at desktop and 375 px width; no horizontal scroll", "passes": false},
+    {"id": "A11", "tier": "must", "description": "Model chip on every step + call log panel (model ID, latency, tokens, cached_tokens, request ID)", "test": "after a run the panel lists every call; chips match the models in the log", "passes": false},
+    {"id": "A12", "tier": "must", "description": ".ics export of deadlines and document-chase reminders", "test": "download the file and open it in a calendar app; events have the right dates", "passes": false},
+    {"id": "A13", "tier": "must", "description": "Spend guard: per-IP run limit + global daily ceiling", "test": "exceed the limit locally with a low ceiling; a friendly message appears and no model call is made", "passes": false},
+    {"id": "A14", "tier": "must", "description": "Visible failure states: page unreachable, empty extract, no matches", "test": "force each case (bad URL, empty profile match); the UI explains what happened", "passes": false},
+    {"id": "A15", "tier": "must", "description": "Deployed on Vercel, protection off, full run works in a fresh incognito window", "test": "Claude clicks through all 3 personas in incognito on the production URL", "passes": false},
+    {"id": "A16", "tier": "cut-if-late", "description": "Super VL reads a sample marksheet photo to prefill the form", "test": "upload the sample image; marks % and course fill in", "passes": false},
+    {"id": "A17", "tier": "cut-if-late", "description": "Results in Kannada / Hindi", "test": "switch language; ledger labels and plan are translated", "passes": false},
+    {"id": "A18", "tier": "cut-if-late", "description": "WhatsApp-ready summary copy button", "test": "click copy; pasted text is under 1,000 chars with links", "passes": false}
+  ]
+}
