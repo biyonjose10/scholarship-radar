@@ -6,10 +6,9 @@ const perIp = new Map<string, number[]>();
 let day = "";
 let dayCount = 0;
 
-const PER_IP_PER_HOUR = Number(process.env.RUNS_PER_IP_PER_HOUR ?? 5);
-const DAILY_CEILING = Number(process.env.DAILY_RUN_CEILING ?? 60);
-
 export function admit(ip: string): { ok: true } | { ok: false; reason: string } {
+  const PER_IP_PER_HOUR = Number(process.env.RUNS_PER_IP_PER_HOUR ?? 5);
+  const DAILY_CEILING = Number(process.env.DAILY_RUN_CEILING ?? 60);
   const today = new Date().toISOString().slice(0, 10);
   if (today !== day) {
     day = today;
