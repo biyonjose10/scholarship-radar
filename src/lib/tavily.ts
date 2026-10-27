@@ -102,28 +102,34 @@ async function post(path: string, body: unknown): Promise<{ status: number; json
   return { status: res.status, json };
 }
 
+// Government sites only: these are the portals that publish the rules themselves.
+export const OFFICIAL_DOMAINS = ["gov.in", "nic.in"];
+
 export async function search(
   query: string,
   step: StepId,
   onCall: (c: ToolCall) => void,
+  opts: { includeDomains?: string[]; maxResults?: number } = {},
 ): Promise<SearchHit[]> {
   const t0 = Date.now();
+  const label = opts.includeDomains ? `${query} (only ${opts.includeDomains.join(", ")})` : query;
   try {
     const { status, json } = await post("/search", {
       query,
       search_depth: "advanced",
-      max_results: 8,
+      max_results: opts.maxResults ?? 8,
       country: "india",
+      ...(opts.includeDomains ? { include_domains: opts.includeDomains } : {}),
     });
     if (status !== 200) throw new Error(`HTTP ${status}: ${JSON.stringify(json).slice(0, 200)}`);
     const results = (json.results as { url: string; title: string; content: string; score: number }[]) ?? [];
-    onCall({ step, tool: "tavily.search", detail: query, ms: Date.now() - t0, credits: 2, ok: true });
+    onCall({ step, tool: "tavily.search", detail: label, ms: Date.now() - t0, credits: 2, ok: true });
     return results.flatMap((r) => {
       const kind = classifySource(r.url);
       return kind === "blocked" ? [] : [{ url: r.url, title: r.title, content: r.content, score: r.score, kind }];
     });
   } catch (e) {
-    onCall({ step, tool: "tavily.search", detail: query, ms: Date.now() - t0, credits: null, ok: false, error: String(e) });
+    onCall({ step, tool: "tavily.search", detail: label, ms: Date.now() - t0, credits: null, ok: false, error: String(e) });
     return [];
   }
 }
