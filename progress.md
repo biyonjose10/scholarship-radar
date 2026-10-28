@@ -36,3 +36,11 @@ Evidence for features flipped to passing:
   (no fake results); empty body → 400 "Please fill in every field."
 
 Not verified yet (needs NEBIUS_API_KEY): A01, A03, A05/A06 in-app, A09, A11 log with real request ids, A15.
+
+## 2026-10-29 ~00:30 IST — UI pass from a Stitch design review (bcd4a3c)
+Asked Google Stitch for a critique; kept only changes backed by real run data (rejected its invented breakdowns,
+"upload document" button and Kannada auto-translation). Added: "Checked for" profile line + run time and call count,
+headline stat boxes (eligible / need one check / close in 3 weeks), per-step seconds in the timeline, the unresolved
+rule shown on "Check 1 rule" rows, and an "Apply on portal" link on open rows.
+Evidence (fixture mode, no API calls): Kavya run shows all of the above; 375 px frame scrollWidth = clientWidth;
+`npm test` 11/11; deployed to unclaimed-nine.vercel.app.
