@@ -1,6 +1,6 @@
 // The agent run: Scout -> Search -> Extract -> Read -> Check -> Verify -> Follow up -> Judge -> Act.
 // Each step reports which model or tool did the work, so the timeline can show it.
-import type { CheckedScholarship, Criterion, ModelCall, Plan, Profile, RunEvent, Scholarship, SourceKind, StepId, ToolCall } from "./types";
+import type { CheckedScholarship, ModelCall, Plan, Profile, RunEvent, Scholarship, SourceKind, StepId, ToolCall } from "./types";
 import { search, extract, rankSources, OFFICIAL_DOMAINS, type ExtractedPage, type SearchHit } from "./tavily";
 import { chatJson, labelOf, MODELS } from "./nebius";
 import { focusText, normalize, quoteInText, signalScore } from "./text";
@@ -8,6 +8,7 @@ import { baseOrder, checkScholarship } from "./checker";
 import { findConflicts } from "./conflicts";
 import { followUpQuery, mergeFollowUp, pickFollowUps, unsettled } from "./followup";
 import { cacheGet, cacheSet, hash } from "./cache";
+import { cleanCriteria } from "./shape";
 import { describeProfile, fallbackQueries, JUDGE_SYSTEM, judgeUser, READER_SYSTEM, readerUser, SCOUT_SYSTEM, scoutUser } from "./prompts";
 
 const MAX_PAGES = 7;
@@ -55,21 +56,9 @@ function verifiedRules(s: Scholarship, pageNorm: string): number {
   return s.criteria.filter((c) => quoteInText(c.quote, pageNorm)).length;
 }
 
-const VALID_KINDS = new Set(["income_max", "categories", "minority_only", "states", "course_levels", "years", "min_marks", "genders", "disability_only", "other"]);
 
-// Models sometimes return near-miss shapes; keep only criteria the checker understands.
-function cleanCriteria(raw: unknown): Criterion[] {
-  if (!Array.isArray(raw)) return [];
-  return raw.filter((c): c is Criterion => {
-    if (!c || typeof c !== "object") return false;
-    const k = (c as { kind?: string }).kind;
-    if (!k || !VALID_KINDS.has(k)) return false;
-    if (typeof (c as { quote?: unknown }).quote !== "string") (c as { quote: string }).quote = "";
-    if ((k === "income_max" || k === "min_marks") && typeof (c as { value?: unknown }).value !== "number") return false;
-    if (["categories", "states", "course_levels", "years", "genders"].includes(k) && !Array.isArray((c as { values?: unknown }).values)) return false;
-    return true;
-  });
-}
+type Period = Scholarship["amount"]["period"];
+const PERIODS: Period[] = ["one-time", "per-year", "per-month", "unknown"];
 
 function toScholarships(raw: Partial<Scholarship>[] | undefined, url: string, kind: SourceKind): Scholarship[] {
   return (raw ?? []).slice(0, 6).flatMap((s): Scholarship[] => {
@@ -82,7 +71,7 @@ function toScholarships(raw: Partial<Scholarship>[] | undefined, url: string, ki
         amount: {
           value: typeof s.amount?.value === "number" ? s.amount.value : null,
           text: String(s.amount?.text ?? ""),
-          period: s.amount?.period ?? "unknown",
+          period: PERIODS.includes(s.amount?.period as Period) ? (s.amount!.period as Period) : "unknown",
         },
         deadline: {
           date: typeof s.deadline?.date === "string" && /^\d{4}-\d{2}-\d{2}$/.test(s.deadline.date) ? s.deadline.date : null,
@@ -131,7 +120,7 @@ async function extractCached(urls: string[], step: StepId, onTool: (c: ToolCall)
   const need = urls.filter((u) => !have.some((h) => h.url === u));
   const fresh = await extract(need, step, onTool);
   for (const p of fresh) cacheSet(`page|${p.url}`, p.text);
-  if (have.length) onTool({ step, tool: "tavily.extract", detail: `${have.length} pages reused from the last hour's runs`, ms: 0, credits: 0, ok: true });
+  if (have.length) onTool({ step, tool: "tavily.extract", detail: `${have.length} pages reused from recent runs (no credits)`, ms: 0, credits: 0, ok: true });
   return [...have, ...fresh];
 }
 

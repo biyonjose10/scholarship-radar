@@ -150,3 +150,28 @@ test("eval scoring: matches schemes by name, counts found, extra and quoted-extr
   assert.equal(s.deadlinesRight, 1);
   assert.deepEqual(s.schemesMissed, ["ST Post-Matric Scholarship"]);
 });
+
+test("criteria shaper maps model spellings and never lets an unknown value exclude a student", async () => {
+  const { cleanCriteria } = await import("./shape");
+  const out = cleanCriteria([
+    { kind: "categories", values: ["obc", "Category-I", "2a"], quote: "q" },
+    { kind: "years", values: ["1st year", 2], quote: "q" },
+    { kind: "genders", values: ["Girls"], quote: "q" },
+    { kind: "course_levels", values: ["Undergraduate", "Diploma"], quote: "q" },
+    { kind: "income_max", value: "2,50,000", forCategories: ["Cat-I"], quote: "q" },
+    { kind: "categories", values: ["Vokkaliga"], quote: "q" }, // unknown group: becomes "other"
+    { kind: "min_marks", value: "sixty", quote: "q" }, // dropped
+    { kind: "nonsense", quote: "q" }, // dropped
+  ]);
+  assert.deepEqual(out[0], { kind: "categories", values: ["OBC", "Cat-1", "2A"], quote: "q" });
+  assert.deepEqual(out[1], { kind: "years", values: [1, 2], quote: "q" });
+  assert.deepEqual(out[2], { kind: "genders", values: ["female"], quote: "q" });
+  assert.deepEqual(out[3], { kind: "course_levels", values: ["ug", "diploma"], quote: "q" });
+  assert.deepEqual(out[4], { kind: "income_max", value: 250000, forCategories: ["Cat-1"], quote: "q" });
+  assert.equal(out[5].kind, "other");
+  assert.equal(out.length, 6);
+  // Kavya (OBC 2A) passes the shaped category rule instead of failing on "obc".
+  const s = { ...official, criteria: [out[0]], sourceUrl: "x" };
+  const page = "q is a placeholder quote text that is long enough";
+  assert.notEqual(checkScholarship(kavya, { ...s, criteria: [{ ...out[0], quote: "q is a placeholder quote" }] }, page, TODAY).eligibility, "not_eligible");
+});

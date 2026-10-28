@@ -555,23 +555,25 @@ function dateLabel(c: CheckedScholarship): { main: string; sub: string; urgent: 
 function Ledger({ list, plan, judging }: { list: CheckedScholarship[]; plan: Plan | null; judging: boolean }) {
   const [open, setOpen] = useState<string | null>(null);
   const [showAll, setShowAll] = useState(false);
-  const { total, count, closingSoon } = claimableTotal(list);
+  const { total, closingSoon } = claimableTotal(list);
   const visible = showAll ? list : list.filter((c) => c.eligibility !== "not_eligible");
   const hidden = list.length - list.filter((c) => c.eligibility !== "not_eligible").length;
   const why = new Map(plan?.ranked.map((r) => [r.id, r.why]) ?? []);
   const ics = buildIcs(list);
   const unsure = list.filter((c) => c.eligibility === "likely" && c.deadlineStatus !== "closed").length;
+  const eligibleOpen = list.filter((c) => c.eligibility === "eligible" && c.deadlineStatus !== "closed").length;
+  const openCount = eligibleOpen + unsure; // same rule as the stat boxes below
 
   return (
     <section className="space-y-6">
       <div className="border-2 border-ink bg-paper p-5">
         <p className="font-mono text-xs uppercase tracking-[0.2em] text-ink/70">Open to you this cycle</p>
         <p className={`mt-1 text-3xl font-semibold sm:text-5xl ${total > 0 ? "font-mono text-rupee" : "font-display text-ink"}`}>
-          {total > 0 ? inr(total) : `${count} scheme${count === 1 ? "" : "s"} you qualify for`}
+          {total > 0 ? inr(total) : `${openCount} scheme${openCount === 1 ? "" : "s"} open to you`}
           {total > 0 && <span className="ml-2 font-sans text-base font-normal text-ink/70">stated per year</span>}
         </p>
         <dl className="mt-4 grid grid-cols-3 border-y border-rule text-sm">
-          <Stat label="Eligible" value={list.filter((c) => c.eligibility === "eligible" && c.deadlineStatus !== "closed").length} tone="text-rupee" />
+          <Stat label="Eligible" value={eligibleOpen} tone="text-rupee" />
           <Stat label="Need one check" value={unsure} tone="text-[#8a5a00]" />
           <Stat label="Close in 3 weeks" value={closingSoon} tone={closingSoon > 0 ? "text-[#b42318]" : "text-ink"} />
         </dl>
