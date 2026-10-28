@@ -4,6 +4,8 @@
 // ssp.karnataka.gov.in on 28 Oct 2026); the checker and verifier output is real.
 import type { Profile, RunEvent, Scholarship } from "./types";
 import { baseOrder, checkScholarship } from "./checker";
+import { findConflicts } from "./conflicts";
+import { normalize } from "./text";
 
 const PAGE = `
 Application deadlines fall for Karnataka’s SSP scholarship 2026-27 across various departments between September 30, 2026, and January 31, 2027.
@@ -11,6 +13,7 @@ Post-Matric Scholarship for Backward Classes: Family income up to ₹2.5 lakh fo
 Post-Matric Scholarship for Minorities Enrolled in Class 11, 12, graduation, post-graduation or a technical/vocational course. Family income up to ₹2.5 lakh from all sources.
 Backward Classes Welfare Department: last date 31/10/2026
 Minorities Welfare: November 15, 2026
+Backward Classes Welfare Department Scheme September 30, 2026 (extended)
 AICTE Pragati Scholarship for girls admitted to first year of degree or diploma, or second year through lateral entry. Family income not more than ₹8 lakh per annum. Scholarship of ₹50,000 per annum. Last date: 31 October 2026.
 `;
 
@@ -80,9 +83,24 @@ const SAMPLE: Scholarship[] = [
   },
 ];
 
+// The same scheme as listed on a secondary site. This mismatch is real: buddy4study.com/article/ssp-scholarship
+// (saved 28 Oct 2026) gives the BCW post-matric date as 30 Sep 2026, while ssp.karnataka.gov.in says 31/10/2026.
+const BCW_ON_AGGREGATOR: Scholarship = {
+  ...SAMPLE[0],
+  deadline: { date: "2026-09-30", text: "September 30, 2026 (extended)", quote: "Backward Classes Welfare Department Scheme September 30, 2026 (extended)" },
+  sourceUrl: "https://www.buddy4study.com/article/ssp-scholarship",
+  sourceKind: "aggregator",
+};
+
 export function fixtureEvents(p: Profile, today: string): RunEvent[] {
   const tag = " (dev fixture — not a real run)";
-  const checked = SAMPLE.map((s) => checkScholarship(p, s, PAGE, today)).sort(baseOrder);
+  const norm = normalize(PAGE);
+  const norms = new Map([...SAMPLE, BCW_ON_AGGREGATOR].map((s) => [s.sourceUrl, norm]));
+  const checked = SAMPLE.map((s) => {
+    const c = checkScholarship(p, s, PAGE, today);
+    const conflicts = s.id === "bcw-post-matric" ? findConflicts(s, [BCW_ON_AGGREGATOR], norms) : [];
+    return conflicts.length ? { ...c, conflicts } : c;
+  }).sort(baseOrder);
   return [
     { type: "step", step: "scout", status: "done", actor: "Nemotron 3.5 Lightning" + tag, detail: "9 searches planned" },
     { type: "queries", queries: ["Karnataka SSP post matric scholarship OBC 2A income limit 2026-27", "AICTE pragati scholarship 2026-27 (gov.in only)"] },
@@ -92,6 +110,7 @@ export function fixtureEvents(p: Profile, today: string): RunEvent[] {
     { type: "step", step: "check", status: "done", actor: "Rule checker (code, no model)", detail: "checker output is real" },
     { type: "step", step: "verify", status: "done", actor: "Source verifier (code, no model)", detail: "verifier output is real" },
     { type: "results", checked },
+    { type: "step", step: "followup", status: "skipped", actor: "Tavily + Nemotron 3 Super" + tag, detail: "No follow-up searches in fixture mode" },
     { type: "step", step: "judge", status: "skipped", actor: "Nemotron 3 Ultra" + tag, detail: "No plan in fixture mode" },
     { type: "step", step: "act", status: "done", actor: "Calendar file (code)" },
     { type: "done" },

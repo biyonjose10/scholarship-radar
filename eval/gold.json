@@ -1,0 +1,60 @@
+{
+  "note": "Hand-labelled from the pages as saved on 28 Oct 2026 (eval/pages, not committed: third-party text). Only what the page itself states, for post-matric/college schemes. years: any of the listed values is accepted.",
+  "pages": [
+    {
+      "file": "pragati_buddy4study.md",
+      "url": "https://www.buddy4study.com/article/pragati-scholarship",
+      "scholarships": [
+        {
+          "name": "AICTE Pragati Scholarship",
+          "deadline": "2026-10-31",
+          "amount": 50000,
+          "rules": [
+            { "kind": "genders", "values": ["female"] },
+            { "kind": "income_max", "value": 800000 },
+            { "kind": "course_levels", "values": ["ug", "diploma"] },
+            { "kind": "years", "values": [1, 2] }
+          ]
+        }
+      ]
+    },
+    {
+      "file": "ssp_buddy4study.md",
+      "url": "https://www.buddy4study.com/article/ssp-scholarship",
+      "scholarships": [
+        {
+          "name": "SC Post-Matric Scholarship",
+          "deadline": "2027-01-31",
+          "rules": [
+            { "kind": "categories", "values": ["SC"] },
+            { "kind": "income_max", "value": 250000 }
+          ]
+        },
+        {
+          "name": "ST Post-Matric Scholarship",
+          "deadline": "2026-12-31",
+          "rules": [
+            { "kind": "categories", "values": ["ST"] },
+            { "kind": "income_max", "value": 250000 }
+          ]
+        },
+        {
+          "name": "Post-Matric Scholarship for Backward Classes",
+          "deadline": "2026-09-30",
+          "rules": [
+            { "kind": "income_max", "value": 250000, "forCategories": ["Cat-1"] },
+            { "kind": "income_max", "value": 100000, "forCategories": ["2A", "3A", "3B"] }
+          ]
+        },
+        {
+          "name": "Post-Matric Scholarship for Minorities",
+          "deadline": "2026-09-30",
+          "rules": [
+            { "kind": "minority_only" },
+            { "kind": "income_max", "value": 250000 }
+          ]
+        }
+      ]
+    }
+  ]
+}

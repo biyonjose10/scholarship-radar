@@ -45,3 +45,6 @@ next-env.d.ts
 
 # local dev caches
 /.cache
+
+# third-party page text used only for local evaluation
+/eval/pages

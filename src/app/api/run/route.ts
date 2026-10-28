@@ -40,13 +40,28 @@ function sse(events: RunEvent[]): Response {
   });
 }
 
+// The saved run is replayed only for exactly the profile it was recorded with.
+function sameProfile(a: Profile, b: Profile): boolean {
+  const keys: (keyof Profile)[] = ["label", "state", "courseLevel", "course", "year", "category", "kaGroup", "minority", "familyIncome", "marksPercent", "gender", "disability"];
+  return keys.every((k) => a[k] === b[k]);
+}
+
 export async function POST(req: Request): Promise<Response> {
-  const profile = parseProfile(await req.json().catch(() => null));
+  const body = (await req.json().catch(() => null)) as (Record<string, unknown> & { replay?: unknown }) | null;
+  const profile = parseProfile(body);
   if (!profile) return Response.json({ error: "Please fill in every field." }, { status: 400 });
 
   if (process.env.NODE_ENV === "development" && process.env.DEV_FIXTURE === "1") {
     const { fixtureEvents } = await import("@/lib/devFixture");
     return sse(fixtureEvents(profile, todayIst()));
+  }
+
+  if (body?.replay === true) {
+    const { RECORDINGS } = await import("@/data/recorded");
+    const rec = RECORDINGS[profile.label];
+    if (rec && sameProfile(rec.profile, profile)) {
+      return sse([{ type: "recorded", recordedAt: rec.recordedAt }, ...rec.events]);
+    }
   }
 
   if (!hasNebiusKey() || !process.env.TAVILY_API_KEY) {

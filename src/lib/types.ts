@@ -67,6 +67,15 @@ export type Eligibility = "eligible" | "likely" | "not_eligible";
 
 export type DeadlineStatus = "open" | "closing_soon" | "closed" | "check_portal";
 
+// An official page and a secondary site disagree on a quoted fact.
+export interface Conflict {
+  field: "deadline" | "income";
+  official: string;
+  secondary: string;
+  secondaryHost: string;
+  secondaryUrl: string;
+}
+
 export interface CheckedScholarship {
   scholarship: Scholarship;
   results: CriterionResult[];
@@ -74,10 +83,12 @@ export interface CheckedScholarship {
   deadlineStatus: DeadlineStatus;
   daysLeft: number | null;
   flags: string[]; // verifier warnings, shown to the student
+  conflicts?: Conflict[]; // official vs secondary disagreements, official wins
+  followUp?: { url: string; settled: number }; // a second, official-only search settled this many rules
 }
 
 // Events streamed from the server to the timeline.
-export type StepId = "scout" | "search" | "extract" | "read" | "check" | "verify" | "judge" | "act";
+export type StepId = "scout" | "search" | "extract" | "read" | "check" | "verify" | "followup" | "judge" | "act";
 
 export interface ModelCall {
   step: StepId;
@@ -116,4 +127,12 @@ export type RunEvent =
   | { type: "results"; checked: CheckedScholarship[] }
   | { type: "plan"; plan: Plan }
   | { type: "error"; message: string }
+  | { type: "recorded"; recordedAt: string } // the events that follow are a saved real run
   | { type: "done" };
+
+// A saved real run: every event with its time in ms from the start, replayed as recorded.
+export interface Recording {
+  recordedAt: string; // ISO time
+  profile: Profile;
+  events: (RunEvent & { at: number })[];
+}

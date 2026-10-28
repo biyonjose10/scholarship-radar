@@ -4,6 +4,9 @@ import { useMemo, useRef, useState } from "react";
 import { PERSONAS } from "@/lib/personas";
 import { claimableTotal, inr } from "@/lib/checker";
 import { buildIcs } from "@/lib/ics";
+import { documentChecklist } from "@/lib/kit";
+import { formatCost, runCost } from "@/lib/pricing";
+import { RECORDING_META } from "@/data/recorded/meta";
 import type {
   CheckedScholarship,
   CourseLevel,
@@ -27,7 +30,8 @@ const STEPS: { id: StepId; title: string; actor: string; kind: ActorKind; what: 
   { id: "extract", title: "Read the pages", actor: "Tavily Extract", kind: "tool", what: "Full text of the best sources, official first" },
   { id: "read", title: "Pull out the rules", actor: "Nemotron 3 Super", kind: "model", what: "Each rule, with the exact sentence it came from" },
   { id: "check", title: "Check each rule against you", actor: "Rule checker (code, no model)", kind: "code", what: "Yes / no / unsure, decided by code" },
-  { id: "verify", title: "Verify against the source", actor: "Source verifier (code, no model)", kind: "code", what: "Rules not on the page are never trusted" },
+  { id: "verify", title: "Verify against the source", actor: "Source verifier (code, no model)", kind: "code", what: "Rules not on the page are never trusted; official beats secondary" },
+  { id: "followup", title: "Search again for unsettled rules", actor: "Tavily + Nemotron 3 Super", kind: "tool", what: "Government sites only, for the rules still unsure" },
   { id: "judge", title: "Rank and plan", actor: "Nemotron 3 Ultra", kind: "model", what: "What to apply for first, and what to do this week" },
   { id: "act", title: "Add to calendar", actor: "Calendar file (code)", kind: "code", what: "Deadlines with reminders" },
 ];
@@ -84,20 +88,24 @@ export default function Radar() {
   const [formOpen, setFormOpen] = useState(false);
   const [ran, setRan] = useState<Profile | null>(null); // the details the current results were checked against
   const [elapsedMs, setElapsedMs] = useState<number | null>(null);
+  const [recordedAt, setRecordedAt] = useState<string | null>(null);
   const resultsRef = useRef<HTMLDivElement>(null);
   const startedAt = useRef(0);
+  const lastAt = useRef(0); // time of the latest event, from the recording when replaying
 
-
+  // Demo students with a saved real run replay it instantly; "Run it live" does a fresh run.
   function pick(i: number) {
     const { blurb: _b, ...p } = PERSONAS[i];
     void _b;
     setProfile(p);
-    run(p);
+    run(p, Boolean(RECORDING_META[p.label]));
   }
 
-  async function run(p: Profile) {
+  async function run(p: Profile, replay = false) {
     if (running) return;
     save(p);
+    setRecordedAt(null);
+    lastAt.current = 0;
     setRunning(true);
     setSteps({});
     setQueries([]);
@@ -111,7 +119,7 @@ export default function Radar() {
     setElapsedMs(null);
     startedAt.current = Date.now();
     try {
-      const res = await fetch("/api/run", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(p) });
+      const res = await fetch("/api/run", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ ...p, replay }) });
       if (!res.ok || !res.body) {
         const j = await res.json().catch(() => ({}));
         setError((j as { error?: string }).error ?? `Request failed (${res.status})`);
@@ -135,14 +143,19 @@ export default function Radar() {
     } catch (e) {
       setError(`Connection lost: ${String(e)}`);
     } finally {
-      setElapsedMs(Date.now() - startedAt.current);
+      setElapsedMs(lastAt.current || Date.now() - startedAt.current);
       setRunning(false);
     }
   }
 
-  function handle(e: RunEvent) {
-    const t = Date.now() - startedAt.current;
+  function handle(e: RunEvent & { at?: number }) {
+    // A replayed run carries its recorded times, so durations are the real ones.
+    const t = e.at ?? Date.now() - startedAt.current;
+    if (e.at !== undefined) lastAt.current = e.at;
     switch (e.type) {
+      case "recorded":
+        setRecordedAt(e.recordedAt);
+        break;
       case "step":
         // Times are measured in this browser from the stream, so they include network time.
         setSteps((s) => {
@@ -249,7 +262,19 @@ export default function Radar() {
           )}
           {started && !checked && !error && <Working queries={queries} sources={sources} />}
           <div ref={resultsRef} />
-          {ordered && ran && <Dossier p={ran} elapsedMs={elapsedMs} calls={calls.length} />}
+          {recordedAt && ran && (
+            <div className="flex flex-wrap items-center justify-between gap-3 border-l-4 border-stamp bg-paper px-4 py-3">
+              <p className="text-sm">
+                <span className="font-semibold">Recorded real run</span> from{" "}
+                {new Date(recordedAt).toLocaleString("en-IN", { day: "numeric", month: "short", hour: "2-digit", minute: "2-digit", timeZone: "Asia/Kolkata" })} IST,
+                replayed instantly. Every call below happened then; nothing new was called.
+              </p>
+              <button onClick={() => run(ran, false)} disabled={running} className="bg-ink px-3 py-1.5 text-sm font-semibold text-paper hover:bg-stamp disabled:opacity-40">
+                Run it live ↻
+              </button>
+            </div>
+          )}
+          {ordered && ran && <Dossier p={ran} elapsedMs={elapsedMs} calls={calls} />}
           {ordered && <Ledger list={ordered} plan={plan} judging={running && !plan && steps.judge?.status === "running"} />}
           {started && <CallLog calls={calls} />}
         </main>
@@ -562,6 +587,8 @@ function Ledger({ list, plan, judging }: { list: CheckedScholarship[]; plan: Pla
         )}
       </div>
 
+      <Kit list={list} />
+
       <div>
         <div className="hidden grid-cols-[110px_1fr_110px_120px] gap-3 border-b-2 border-ink pb-1 font-mono text-[11px] uppercase tracking-wider text-ink/70 sm:grid">
           <span>Last date</span>
@@ -595,6 +622,17 @@ function Ledger({ list, plan, judging }: { list: CheckedScholarship[]; plan: Pla
                     {c.eligibility === "likely" && openQuestion(c) && (
                       <span className="mt-1 block text-xs text-[#8a5a00]">To check: {openQuestion(c)}</span>
                     )}
+                    {c.followUp && (
+                      <span className="mt-1 block text-xs text-rupee">
+                        Settled {c.followUp.settled} rule{c.followUp.settled === 1 ? "" : "s"} with a second search of government sites
+                      </span>
+                    )}
+                    {c.conflicts?.map((x, i) => (
+                      <span key={i} className="mt-1 block bg-marigold/20 px-1.5 py-0.5 text-xs">
+                        {x.secondaryHost} says {x.field === "deadline" ? "the last date is" : "the income limit is"} <b>{x.secondary}</b>; the official
+                        page says <b>{x.official}</b>. Go by the official page.
+                      </span>
+                    ))}
                   </span>
                   <span className="order-4 text-right font-mono text-sm sm:order-none">
                     {s.amount.value ? inr(s.amount.value) : <span className="text-xs text-ink/70">{s.amount.text || "—"}</span>}
@@ -650,6 +688,46 @@ function Ledger({ list, plan, judging }: { list: CheckedScholarship[]; plan: Pla
   );
 }
 
+// The documents to start collecting tonight, merged across every open scheme.
+function Kit({ list }: { list: CheckedScholarship[] }) {
+  const [all, setAll] = useState(false);
+  const kit = documentChecklist(list);
+  if (kit.length === 0) return null;
+  const shown = all ? kit : kit.slice(0, 5);
+  return (
+    <div className="border border-rule bg-paper p-4">
+      <h3 className="font-display text-lg font-semibold">
+        Documents to get ready <ActorChip kind="code" label="merged by code" />
+      </h3>
+      <p className="text-xs text-ink/70">One list for every scheme still open to you, most-needed first.</p>
+      <ol className="mt-3 divide-y divide-rule text-sm">
+        {shown.map((k, i) => (
+          <li key={k.doc} className="grid grid-cols-[22px_1fr_auto] items-baseline gap-2 py-1.5">
+            <span className="font-mono text-xs text-ink/50">{i + 1}</span>
+            <span>
+              <span className="font-medium">{k.doc}</span>
+              <span className="block text-xs text-ink/60">{k.schemes.join(" · ")}</span>
+            </span>
+            <span className="text-right font-mono text-xs">
+              {k.schemes.length} scheme{k.schemes.length === 1 ? "" : "s"}
+              {k.firstDeadline && (
+                <span className="block text-ink/60">
+                  by {new Date(k.firstDeadline + "T00:00:00Z").toLocaleDateString("en-IN", { day: "numeric", month: "short", timeZone: "UTC" })}
+                </span>
+              )}
+            </span>
+          </li>
+        ))}
+      </ol>
+      {kit.length > 5 && (
+        <button onClick={() => setAll((v) => !v)} className="mt-1 text-xs underline">
+          {all ? "Show fewer" : `Show all ${kit.length}`}
+        </button>
+      )}
+    </div>
+  );
+}
+
 function Stat({ label, value, tone }: { label: string; value: number; tone: string }) {
   return (
     <div className="border-r border-rule px-2 py-2 last:border-r-0 first:pl-0">
@@ -667,7 +745,9 @@ function openQuestion(c: CheckedScholarship): string | null {
 const LEVEL: Record<CourseLevel, string> = { school: "School", diploma: "Diploma", ug: "UG", pg: "PG", phd: "PhD" };
 
 // The details these results were checked against, so a viewer can see the inputs next to the answer.
-function Dossier({ p, elapsedMs, calls }: { p: Profile; elapsedMs: number | null; calls: number }) {
+function Dossier({ p, elapsedMs, calls }: { p: Profile; elapsedMs: number | null; calls: ({ t: number } & ({ m: ModelCall } | { x: ToolCall }))[] }) {
+  const cost = runCost(calls.flatMap((c) => ("m" in c ? [c.m] : [])));
+  const credits = calls.reduce((n, c) => n + ("x" in c ? (c.x.credits ?? 0) : 0), 0);
   const cat = p.category === "OBC" && p.kaGroup ? `OBC ${p.kaGroup}` : p.category;
   const items = [
     p.state,
@@ -686,7 +766,9 @@ function Dossier({ p, elapsedMs, calls }: { p: Profile; elapsedMs: number | null
       </p>
       {elapsedMs !== null && (
         <p className="font-mono text-xs text-ink/60">
-          Done in {(elapsedMs / 1000).toFixed(0)} s · {calls} calls
+          Done in {(elapsedMs / 1000).toFixed(0)} s · {calls.length} calls
+          {cost.priced > 0 && <> · Nemotron cost {formatCost(cost.usd)}</>}
+          {credits > 0 && <> · {credits} Tavily credits</>}
         </p>
       )}
     </div>
@@ -742,6 +824,11 @@ function Detail({ c }: { c: CheckedScholarship }) {
         <a className="underline" href={s.sourceUrl} target="_blank" rel="noreferrer">
           Source page
         </a>
+        {c.followUp && (
+          <a className="underline" href={c.followUp.url} target="_blank" rel="noreferrer">
+            Second source (government)
+          </a>
+        )}
         {s.applyUrl && (
           <a className="underline" href={s.applyUrl} target="_blank" rel="noreferrer">
             Where to apply

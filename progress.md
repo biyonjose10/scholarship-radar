@@ -44,3 +44,19 @@ headline stat boxes (eligible / need one check / close in 3 weeks), per-step sec
 rule shown on "Check 1 rule" rows, and an "Apply on portal" link on open rows.
 Evidence (fixture mode, no API calls): Kavya run shows all of the above; 375 px frame scrollWidth = clientWidth;
 `npm test` 11/11; deployed to unclaimed-nine.vercel.app.
+
+## 2026-10-29 ~00:10 IST — Tier 1 + 2 features, built without any model calls
+- Official vs secondary conflict flag (`conflicts.ts`): only facts quoted on their own page count. Real case found in the
+  saved pages: buddy4study.com/article/ssp-scholarship lists BCW post-matric as "September 30, 2026 (extended)"; the official
+  SSP portal says 31/10/2026. The fixture now uses this real mismatch.
+- Follow-up step (`followup.ts`, new step "followup"): up to 2 "likely" schemes get one government-only Tavily search for
+  the unsettled rule, the page is read by Super, rules quoted there replace unquoted ones, and the scheme is re-checked.
+  Skipped if the run passes 150 s. NOT yet run for real (needs the Nebius key).
+- Document checklist (`kit.ts`), run cost from token counts (`pricing.ts`), 6-hour memory cache for pages and readings
+  (`cache.ts`).
+- Recorded runs: `scripts/record.mts` saves a real run per demo student; the site replays it with a "Recorded real run"
+  banner and "Run it live ↻". Tested with a temporary sample recording (removed); none recorded yet.
+- Accuracy harness: `eval/gold.json` (hand-labelled from 2 real pages, 5 schemes, 14 rules), `src/lib/evalScore.ts`,
+  `scripts/eval.mts`. NOT run yet (needs the key). Pages are gitignored (third-party text).
+Evidence: `npm test` 18/18; fixture Kavya run shows the conflict line, checklist, follow-up step; replay banner and
+recorded duration shown; Arjun without a recording gets "not configured" (no call made).
