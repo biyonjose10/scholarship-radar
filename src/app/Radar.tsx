@@ -32,7 +32,7 @@ const STEPS: { id: StepId; title: string; actor: string; kind: ActorKind; what: 
   { id: "act", title: "Add to calendar", actor: "Calendar file (code)", kind: "code", what: "Deadlines with reminders" },
 ];
 
-type StepState = { status: "idle" | "running" | "done" | "failed" | "skipped"; actor?: string; detail?: string };
+type StepState = { status: "idle" | "running" | "done" | "failed" | "skipped"; actor?: string; detail?: string; startMs?: number; endMs?: number };
 
 const STATES = [
   "Karnataka", "Andhra Pradesh", "Telangana", "Tamil Nadu", "Kerala", "Maharashtra", "Delhi", "Uttar Pradesh",
@@ -82,6 +82,8 @@ export default function Radar() {
   const [plan, setPlan] = useState<Plan | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [formOpen, setFormOpen] = useState(false);
+  const [ran, setRan] = useState<Profile | null>(null); // the details the current results were checked against
+  const [elapsedMs, setElapsedMs] = useState<number | null>(null);
   const resultsRef = useRef<HTMLDivElement>(null);
   const startedAt = useRef(0);
 
@@ -105,6 +107,8 @@ export default function Radar() {
     setPlan(null);
     setError(null);
     setFormOpen(false);
+    setRan(p);
+    setElapsedMs(null);
     startedAt.current = Date.now();
     try {
       const res = await fetch("/api/run", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(p) });
@@ -131,6 +135,7 @@ export default function Radar() {
     } catch (e) {
       setError(`Connection lost: ${String(e)}`);
     } finally {
+      setElapsedMs(Date.now() - startedAt.current);
       setRunning(false);
     }
   }
@@ -139,7 +144,13 @@ export default function Radar() {
     const t = Date.now() - startedAt.current;
     switch (e.type) {
       case "step":
-        setSteps((s) => ({ ...s, [e.step]: { status: e.status, actor: e.actor, detail: e.detail } }));
+        // Times are measured in this browser from the stream, so they include network time.
+        setSteps((s) => {
+          const prev = s[e.step];
+          const startMs = e.status === "running" ? t : (prev?.startMs ?? t);
+          const endMs = e.status === "running" ? undefined : t;
+          return { ...s, [e.step]: { status: e.status, actor: e.actor, detail: e.detail, startMs, endMs } };
+        });
         break;
       case "queries":
         setQueries(e.queries);
@@ -238,6 +249,7 @@ export default function Radar() {
           )}
           {started && !checked && !error && <Working queries={queries} sources={sources} />}
           <div ref={resultsRef} />
+          {ordered && ran && <Dossier p={ran} elapsedMs={elapsedMs} calls={calls.length} />}
           {ordered && <Ledger list={ordered} plan={plan} judging={running && !plan && steps.judge?.status === "running"} />}
           {started && <CallLog calls={calls} />}
         </main>
@@ -414,6 +426,9 @@ function Timeline({ steps }: { steps: Record<string, StepState> }) {
                   <span className="sr-only"> — {st.status}</span>
                 </p>
                 <ActorChip kind={s.kind} label={st.actor ?? s.actor} />
+                {st.startMs !== undefined && st.endMs !== undefined && (
+                  <span className="ml-2 font-mono text-[11px] text-ink/60">{((st.endMs - st.startMs) / 1000).toFixed(1)} s</span>
+                )}
                 {st.detail && <p className="mt-1 text-xs text-ink/80">{st.detail}</p>}
               </div>
             </li>
@@ -520,29 +535,22 @@ function Ledger({ list, plan, judging }: { list: CheckedScholarship[]; plan: Pla
   const hidden = list.length - list.filter((c) => c.eligibility !== "not_eligible").length;
   const why = new Map(plan?.ranked.map((r) => [r.id, r.why]) ?? []);
   const ics = buildIcs(list);
+  const unsure = list.filter((c) => c.eligibility === "likely" && c.deadlineStatus !== "closed").length;
 
   return (
     <section className="space-y-6">
       <div className="border-2 border-ink bg-paper p-5">
         <p className="font-mono text-xs uppercase tracking-[0.2em] text-ink/70">Open to you this cycle</p>
-        <p className="mt-1 font-display text-3xl font-semibold sm:text-4xl">
-          {count} scholarship{count === 1 ? "" : "s"}
-          {total > 0 && (
-            <>
-              {" "}
-              · <span className="font-mono text-rupee">{inr(total)}</span>
-              <span className="text-base font-normal text-ink/70"> stated per year</span>
-            </>
-          )}
+        <p className={`mt-1 text-3xl font-semibold sm:text-5xl ${total > 0 ? "font-mono text-rupee" : "font-display text-ink"}`}>
+          {total > 0 ? inr(total) : `${count} scheme${count === 1 ? "" : "s"} you qualify for`}
+          {total > 0 && <span className="ml-2 font-sans text-base font-normal text-ink/70">stated per year</span>}
         </p>
-        <p className="mt-1 text-sm">
-          {closingSoon > 0 ? (
-            <span className="bg-marigold/25 px-1 font-semibold">{closingSoon} close within 3 weeks.</span>
-          ) : (
-            "None close within 3 weeks."
-          )}{" "}
-          Many government schemes pay your fees directly, so they show no fixed amount.
-        </p>
+        <dl className="mt-4 grid grid-cols-3 border-y border-rule text-sm">
+          <Stat label="Eligible" value={list.filter((c) => c.eligibility === "eligible" && c.deadlineStatus !== "closed").length} tone="text-rupee" />
+          <Stat label="Need one check" value={unsure} tone="text-[#8a5a00]" />
+          <Stat label="Close in 3 weeks" value={closingSoon} tone={closingSoon > 0 ? "text-[#b42318]" : "text-ink"} />
+        </dl>
+        <p className="mt-3 text-sm text-ink/80">Many government schemes pay your fees directly, so they show no fixed amount.</p>
         {ics && (
           <a
             href={`data:text/calendar;charset=utf-8,${encodeURIComponent(ics)}`}
@@ -584,6 +592,9 @@ function Ledger({ list, plan, judging }: { list: CheckedScholarship[]; plan: Pla
                       <span className="truncate">{s.provider}</span>
                     </span>
                     {why.get(s.id) && <span className="mt-1 block text-sm text-ink/85">{why.get(s.id)}</span>}
+                    {c.eligibility === "likely" && openQuestion(c) && (
+                      <span className="mt-1 block text-xs text-[#8a5a00]">To check: {openQuestion(c)}</span>
+                    )}
                   </span>
                   <span className="order-4 text-right font-mono text-sm sm:order-none">
                     {s.amount.value ? inr(s.amount.value) : <span className="text-xs text-ink/70">{s.amount.text || "—"}</span>}
@@ -592,6 +603,16 @@ function Ledger({ list, plan, judging }: { list: CheckedScholarship[]; plan: Pla
                     <Stamp c={c} />
                   </span>
                 </button>
+                {s.applyUrl && c.eligibility !== "not_eligible" && c.deadlineStatus !== "closed" && !isOpen && (
+                  <a
+                    href={s.applyUrl}
+                    target="_blank"
+                    rel="noreferrer"
+                    className="mb-3 ml-1 inline-block border border-ink px-2 py-0.5 font-mono text-xs uppercase tracking-wider hover:bg-ink hover:text-paper"
+                  >
+                    Apply on portal ↗
+                  </a>
+                )}
                 {isOpen && <Detail c={c} />}
               </li>
             );
@@ -626,6 +647,49 @@ function Ledger({ list, plan, judging }: { list: CheckedScholarship[]; plan: Pla
         {!plan && !judging && <p className="mt-2 text-sm text-ink/70">No plan for this run; the list above is in the checker&apos;s order (eligible first, soonest deadline first).</p>}
       </div>
     </section>
+  );
+}
+
+function Stat({ label, value, tone }: { label: string; value: number; tone: string }) {
+  return (
+    <div className="border-r border-rule px-2 py-2 last:border-r-0 first:pl-0">
+      <dt className="font-mono text-[10px] uppercase tracking-wider text-ink/60">{label}</dt>
+      <dd className={`font-mono text-2xl font-semibold ${tone}`}>{value}</dd>
+    </div>
+  );
+}
+
+// The first rule the checker could not settle, in plain words.
+function openQuestion(c: CheckedScholarship): string | null {
+  return c.results.find((r) => r.verdict === "unknown")?.reason ?? null;
+}
+
+const LEVEL: Record<CourseLevel, string> = { school: "School", diploma: "Diploma", ug: "UG", pg: "PG", phd: "PhD" };
+
+// The details these results were checked against, so a viewer can see the inputs next to the answer.
+function Dossier({ p, elapsedMs, calls }: { p: Profile; elapsedMs: number | null; calls: number }) {
+  const cat = p.category === "OBC" && p.kaGroup ? `OBC ${p.kaGroup}` : p.category;
+  const items = [
+    p.state,
+    `${p.course || LEVEL[p.courseLevel]} · year ${p.year}`,
+    cat + (p.minority ? " · minority" : ""),
+    `${inr(p.familyIncome)} family income`,
+    `${p.marksPercent}% marks`,
+    p.gender === "female" ? "Female" : p.gender === "male" ? "Male" : "Other",
+    ...(p.disability ? ["Disability"] : []),
+  ];
+  return (
+    <div className="flex flex-wrap items-baseline justify-between gap-x-4 gap-y-1 border-b border-rule pb-3">
+      <p className="text-sm">
+        <span className="font-mono text-[11px] uppercase tracking-wider text-ink/60">Checked for {p.label}: </span>
+        {items.join(" · ")}
+      </p>
+      {elapsedMs !== null && (
+        <p className="font-mono text-xs text-ink/60">
+          Done in {(elapsedMs / 1000).toFixed(0)} s · {calls} calls
+        </p>
+      )}
+    </div>
   );
 }
 
