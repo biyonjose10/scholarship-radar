@@ -6,6 +6,7 @@ import { resolve } from "node:path";
 import { chatJson, MODELS } from "../src/lib/nebius";
 import { focusText } from "../src/lib/text";
 import { READER_SYSTEM, readerUser } from "../src/lib/prompts";
+import { cleanCriteria } from "../src/lib/shape";
 import { scorePage, type GoldScholarship, type PageScore } from "../src/lib/evalScore";
 import { PERSONAS } from "../src/lib/personas";
 import type { Scholarship } from "../src/lib/types";
@@ -29,11 +30,14 @@ for (const p of gold.pages) {
     thinking: false, // copying text out, not reasoning
     step: "read",
     system: READER_SYSTEM,
-    user: readerUser(profile, p.url, focusText(text)),
+    // Measuring extraction, not relevance: the app's Reader also skips schemes that don't fit the student.
+    user: readerUser(profile, p.url, focusText(text)) + "\n\nEvaluation run: include every college-level scholarship on this page, whether or not it fits this student (up to 8).",
     maxTokens: 6000,
     onCall: (c) => console.log(`  ${c.model} ${c.ms} ms, ${c.promptTokens}/${c.completionTokens} tokens, ${c.requestId}`),
   });
-  const got = (out.scholarships ?? []).map((s) => ({ ...s, criteria: Array.isArray(s.criteria) ? s.criteria : [], deadline: s.deadline ?? { date: null, text: "", quote: null } }));
+  // The same shaping the app applies before checking.
+  const got = (out.scholarships ?? []).map((s) => ({ ...s, criteria: cleanCriteria(s.criteria), deadline: s.deadline ?? { date: null, text: "", quote: null } }));
+  for (const g of got) console.log(`    read: ${g.name} | ${g.deadline.date} | ${g.criteria.map((c) => c.kind + ("value" in c ? "=" + c.value + ("forCategories" in c && c.forCategories ? "[" + c.forCategories.join("/") + "]" : "") : "values" in c ? "=" + c.values.join("/") : "")).join(", ")}`);
   const s = scorePage(p.scholarships, got, text);
   console.log(`${p.file}: ${s.found}/${s.goldRules} rules, ${s.deadlinesRight}/${s.deadlines} deadlines, ${s.extra} extra (${s.extraPassedVerifier} quoted), missed: ${s.schemesMissed.join(", ") || "none"}`);
   for (const k of ["goldRules", "found", "extra", "extraPassedVerifier", "deadlines", "deadlinesRight"] as const) total[k] += s[k];

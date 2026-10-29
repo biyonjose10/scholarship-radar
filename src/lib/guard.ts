@@ -1,4 +1,5 @@
-// Spend guard: keeps a public demo URL from draining the hackathon credits.
+// Spend guard: keeps a public demo URL from draining the hackathon credits. 20 live runs a day
+// is about 500 Tavily credits; the demo students replay recorded runs and cost nothing.
 // In-memory per server instance, so it is a brake, not a wall; the Token Factory
 // and Tavily dashboards remain the hard limit.
 
@@ -8,7 +9,7 @@ let dayCount = 0;
 
 export function admit(ip: string): { ok: true } | { ok: false; reason: string } {
   const PER_IP_PER_HOUR = Number(process.env.RUNS_PER_IP_PER_HOUR ?? 5);
-  const DAILY_CEILING = Number(process.env.DAILY_RUN_CEILING ?? 60);
+  const DAILY_CEILING = Number(process.env.DAILY_RUN_CEILING ?? 20);
   const today = new Date().toISOString().slice(0, 10);
   if (today !== day) {
     day = today;

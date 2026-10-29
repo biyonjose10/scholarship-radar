@@ -31,18 +31,22 @@ function words(s: string): Set<string> {
   return new Set(normalize(s).replace(/[^a-z0-9 ]+/g, " ").split(" ").filter((w) => w.length > 1 && !["scholarship", "scheme", "the", "for", "of"].includes(w)));
 }
 
-// Gold names are short ("SC Post-Matric Scholarship"); match on shared words, and short
-// codes (SC, ST, OBC) must all be present so SC and ST schemes are never confused.
-export function sameScheme(gold: string, got: string): boolean {
+// How well a returned name matches a gold name: share of the gold name's words present, or 0
+// if a short code (SC, ST, OBC) is missing, so SC and ST schemes are never confused.
+export function nameMatch(gold: string, got: string): number {
   const a = words(gold);
   const b = words(got);
-  if (a.size === 0) return false;
+  if (a.size === 0) return 0;
   let shared = 0;
   for (const w of a) {
     if (b.has(w)) shared++;
-    else if (w.length <= 3) return false;
+    else if (w.length <= 3) return 0;
   }
-  return shared / a.size >= 0.6;
+  return shared / a.size;
+}
+
+export function sameScheme(gold: string, got: string): boolean {
+  return nameMatch(gold, got) >= 0.5;
 }
 
 const sorted = (x?: (string | number)[]) => [...(x ?? [])].map(String).sort().join(",");
@@ -70,10 +74,15 @@ export function ruleMatches(g: GoldRule, c: Criterion): boolean {
 export function scorePage(gold: GoldScholarship[], got: Scholarship[], pageText: string): PageScore {
   const page = normalize(pageText);
   const s: PageScore = { goldRules: 0, found: 0, extra: 0, extraPassedVerifier: 0, deadlines: 0, deadlinesRight: 0, schemesMissed: [] };
+  const taken = new Set<Scholarship>();
   for (const g of gold) {
     s.goldRules += g.rules.length;
     if (g.deadline) s.deadlines++;
-    const m = got.find((x) => sameScheme(g.name, x.name));
+    // Best unused match, so one returned scheme can't stand in for two gold ones.
+    const m = got
+      .filter((x) => !taken.has(x) && sameScheme(g.name, x.name))
+      .sort((x, y) => nameMatch(g.name, y.name) - nameMatch(g.name, x.name))[0];
+    if (m) taken.add(m);
     if (!m) {
       s.schemesMissed.push(g.name);
       continue;

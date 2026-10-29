@@ -77,7 +77,7 @@ tags are: "General","OBC","SC","ST","EWS","Cat-1","2A","2B","3A","3B","Minority"
 Rules:
 1. Every "quote" must be copied EXACTLY, word for word, from the page: one contiguous phrase of 6-30 words. Never paraphrase. Code will reject any rule whose quote is not on the page.
 2. Income in rupees as a number: "₹2.5 lakh" = 250000, "₹1 lakh" = 100000, "8 LPA" = 800000.
-3. If income limits differ by group (e.g. Karnataka Category-I vs 2A/3A/3B), write one income_max per group with forCategories.
+3. If income limits differ by group (e.g. Karnataka Category-I vs 2A/3A/3B), write one income_max per group with forCategories. Karnataka's "Category I", "Category-1" or "Cat-I" is the tag "Cat-1" (a backward-class group), never "General".
 4. If a scheme has tiers with different benefits, write one scholarship per tier.
 5. Deadline: the last date to apply in the current cycle, as YYYY-MM-DD, with the exact quote. Indian pages write dates day-first: "31/10/2026" and "10.07.2025" are 31 October 2026 and 10 July 2025. If the page gives dates by department, pick the department matching the scheme. If none, date null.
 6. cycle: the academic year the page's dates belong to, e.g. "2026-27"; null if not stated.
