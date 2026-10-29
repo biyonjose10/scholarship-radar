@@ -608,7 +608,7 @@ function Ledger({ list, plan, judging }: { list: CheckedScholarship[]; plan: Pla
                 <button
                   onClick={() => setOpen(isOpen ? null : s.id)}
                   aria-expanded={isOpen}
-                  className="grid w-full grid-cols-[1fr_auto] gap-x-3 gap-y-1 px-1 py-3 text-left hover:bg-paper sm:grid-cols-[110px_1fr_110px_120px] sm:items-center"
+                  className="grid w-full grid-cols-[minmax(0,1fr)_auto] gap-x-3 gap-y-1 px-1 py-3 text-left hover:bg-paper sm:grid-cols-[110px_1fr_110px_120px] sm:items-center"
                 >
                   <span className="order-3 font-mono text-sm sm:order-none">
                     {d.main}
@@ -642,7 +642,7 @@ function Ledger({ list, plan, judging }: { list: CheckedScholarship[]; plan: Pla
                       </span>
                     ))}
                   </span>
-                  <span className="order-4 text-right font-mono text-sm sm:order-none">
+                  <span className="order-4 max-w-[8.5rem] justify-self-end break-words text-right font-mono text-sm sm:order-none sm:max-w-none">
                     {s.amount.value ? inr(s.amount.value) : <span className="text-xs text-ink/70">{s.amount.text || "—"}</span>}
                   </span>
                   <span className="order-2 text-right sm:order-none">
