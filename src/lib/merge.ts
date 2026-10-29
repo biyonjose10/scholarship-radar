@@ -116,6 +116,13 @@ ${textByUrl.get(donor.sourceUrl) ?? ""}`;
       if (newest.sourceUrl !== base.sourceUrl) text = `${text}\n\n${textByUrl.get(newest.sourceUrl) ?? ""}`;
     }
   }
+  // A generic name ("Post Matric Scholarship") reads badly in a list; use a copy's name that
+  // says whose scheme it is, if there is one.
+  if (!departmentOf(merged.name)) {
+    const named = copies.find((c) => departmentOf(c.name));
+    if (named) merged = { ...merged, name: named.name };
+  }
+
   // The official date quote names the department ("Backward Classes Welfare Department's
   // post-matric scholarship..."): unless the rules already say who it is for, that does.
   if (merged.sourceKind === "official" && merged.deadline.quote && !merged.criteria.some((c) => WHO_KINDS.has(c.kind))) {

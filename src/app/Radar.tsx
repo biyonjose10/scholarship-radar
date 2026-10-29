@@ -643,7 +643,13 @@ function Ledger({ list, plan, judging }: { list: CheckedScholarship[]; plan: Pla
                     ))}
                   </span>
                   <span className="order-4 max-w-[8.5rem] justify-self-end break-words text-right font-mono text-sm sm:order-none sm:max-w-none">
-                    {s.amount.value ? inr(s.amount.value) : <span className="text-xs text-ink/70">{s.amount.text || "—"}</span>}
+                    {s.amount.value ? (
+                      inr(s.amount.value)
+                    ) : (
+                      <span className="text-xs text-ink/70" title={s.amount.text}>
+                        {s.amount.text.length > 48 ? s.amount.text.slice(0, 46).trimEnd() + "…" : s.amount.text || "—"}
+                      </span>
+                    )}
                   </span>
                   <span className="order-2 text-right sm:order-none">
                     <Stamp c={c} />

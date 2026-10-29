@@ -1,81 +1,88 @@
 # Unclaimed — submission kit (drafts)
 
-Everything marked **TODO** needs a real number, quote or clip before submitting. Nothing in the video may show something the live app doesn't do.
+Everything marked **TODO** needs a real quote or clip before submitting. Nothing in the video may show something the live app doesn't do.
 
 ---
 
 ## 1. Devpost fields
 
 **Name:** Unclaimed
-**Tagline (≤ 200 chars):** Finds the scholarships an Indian student can still claim, checks every rule against them with the exact sentence it came from, and hands back a dated plan. Nemotron on Nebius Token Factory + Tavily.
+**Tagline (≤ 200 chars):** Finds the scholarships an Indian student can still claim, checks every rule with the exact sentence it came from, and catches when websites get the deadline wrong. Nemotron + Tavily.
 **Track:** Best Apps & Agents · **Bonus:** Best Use of Tavily
 **Built with:** Nebius Token Factory, NVIDIA Nemotron 3 Ultra, NVIDIA Nemotron 3 Super, NVIDIA Nemotron 3.5 Lightning, Tavily Search, Tavily Extract, Next.js, TypeScript, Vercel
 **Demo:** https://unclaimed-nine.vercel.app · **Repo:** https://github.com/biyonjose10/scholarship-radar (public at submission)
 
-### Story (draft)
+### Story
 
 **Inspiration**
-In Karnataka alone, the state scholarship portal lists a different last date for each department — Backward Classes Welfare's post-matric scholarship closes on 31/10/2026, Social Welfare's on 31/01/2027 — and the income limit for the same scheme is ₹2.5 lakh for Category-1 students but ₹1 lakh for 2A/3A/3B. Add the National Scholarship Portal, AICTE and dozens of foundations, rules that change every year, and official pages written in Kannada, and students find out about the scheme they qualified for after it closed. TODO: one real student quote here.
+On 28 October we looked up one scholarship, Karnataka's post-matric scholarship for Backward Classes, and found three different last dates. The department's own page said 31 August. Buddy4Study, where most students look, said 30 September. The state portal's notice board, in Kannada, said 31 October. Two of the three say it's closed; it closes on Saturday. Multiply that by every department, the National Scholarship Portal, AICTE and the foundations, rules that change every year and income limits that differ by caste group (₹2.5 lakh for Category-1, ₹1 lakh for 2A/3A/3B), and students find out about the scheme they qualified for after it closed. TODO: one real student quote here.
 
 **What it does**
-Eight facts in (or one tap on a demo student). Two minutes later: every scholarship found, each eligibility rule ticked ✓, crossed ✗ or marked ? against you, the sentence each rule came from, which ones close soonest, what to do this week, and a calendar file with reminders.
+Eight facts in, or one tap on a demo student. Under a minute later: every scholarship found, each eligibility rule ticked ✓, crossed ✗ or marked ? against you with the sentence it came from, which ones close soonest, where a website disagrees with the official page, one document checklist, what to do this week, and a calendar file with reminders.
 
 **How we built it**
-An eight-step agent, each step labelled in the interface with the model or tool doing it:
-- **Nemotron 3.5 Lightning** (Token Factory) plans the searches.
-- **Tavily Search** runs them on the open web and restricted to `gov.in`/`nic.in`; own-state government pages rank first, other states' pages are dropped. **Tavily Extract** reads the full text.
-- **Nemotron 3 Super** (Token Factory, JSON mode) extracts each rule with a word-for-word quote — including from Kannada pages.
-- **Code, not a model, decides eligibility**, and a verifier rejects any rule whose quote isn't on the page and flags dates from old cycles.
-- **Nemotron 3 Ultra** (Token Factory) ranks what's left and writes the plan.
-Next.js on Vercel, Server-Sent Events for the live timeline, a per-IP spend guard, 11 unit tests.
+A nine-step agent, each step labelled in the interface with the model, tool or code doing it:
+- **Nemotron 3.5 Lightning** plans the searches.
+- **Tavily Search** runs them on the open web, restricted to `gov.in`/`nic.in`, and on the state scholarship portal. **Tavily Extract** reads the full pages.
+- **Nemotron 3 Super** (JSON mode) extracts each rule with a word-for-word quote, including from Kannada pages. The portal's notice board has a fixed format, so code reads its dates.
+- **Code merges copies** of the same scheme across pages, takes the newest official date and shows the older one; **code decides eligibility**; a **verifier** rejects any rule whose quote isn't on the page and flags when a secondary site disagrees with the official one.
+- For rules still unsettled, the agent **searches government sites again** for that one rule and re-checks.
+- **Nemotron 3 Ultra** ranks what's left and writes the plan.
+Next.js on Vercel, Server-Sent Events for the live timeline, a spend guard, recorded real runs for the demo students, 23 unit tests and a labelled accuracy test.
 
 **Challenges**
-- Official portals are invisible to ordinary search and some are JavaScript shells; restricting Tavily to government domains surfaced them.
-- Our first ranking put a Manipur page first for a Karnataka student — any `.gov.in` looked "official". Now the student's state wins and other states are dropped.
-- A look-alike domain (`sspscholarshipkarnataka.in`) mimics the real portal.
-- Letting a model say "you're eligible" felt wrong for money decisions, so the model only reads; code decides; every rule shows its source sentence.
+- **Three dates for one scheme.** Deadlines get extended and department pages lag. We group copies of a scheme by level and department (names never match) and trust the newest dated official notice.
+- **The model mixed up years** on the portal's notice board, which lists every year's dates in the same Kannada sentence. A parser reads it exactly.
+- **Nemotron thinks by default.** Lightning spent its whole token budget thinking and returned nothing; Super took up to a minute per page. Switching thinking off for extraction took a run from 182 s to under a minute.
+- **"Official" isn't enough.** Our first ranking put a Manipur page first for a Karnataka student, and a look-alike domain (`sspscholarshipkarnataka.in`) mimics the real portal.
+- **Money decisions shouldn't come from a model**, so the model only reads; code decides; every rule shows its source.
 
-**Accomplishments** — TODO after real runs: e.g. "N of M rules verified word-for-word against their source pages in our test runs".
+**Accomplishments**
+- On hand-labelled pages, over three runs: **34 of 36 rules and 14 of 15 deadlines read correctly, 0 invented rules.**
+- It catches the real Buddy4Study date error for the BCW scheme and the Minorities Welfare one (30 Sept vs the official 30 Nov).
+- A full run costs about **$0.015 (₹1.5)** and takes 30–75 s.
 
-**What we learned** — TODO (one honest paragraph: Token Factory JSON mode, Nemotron on Kannada text, Tavily include_domains).
+**What we learned**
+Token Factory's OpenAI-compatible API made switching models trivial, and JSON mode was reliable once thinking was off. Nemotron 3 Super reads Kannada notices and copies quotes in the original script. Turning reasoning off where the job is copying, and on where it's judging, was the biggest speed and cost win. Tavily's `include_domains` is what makes official portals findable at all. And the hardest part of this problem isn't AI: it's that the official sources disagree with each other.
 
-**What's next** — WhatsApp reminders, more states' category systems, a college scholarship-cell view that runs the check for a whole class.
+**What's next**
+More states' notice boards, WhatsApp reminders, and a college scholarship-cell view that runs the check for a whole class.
 
-**Limitations** — link to the README section.
-
----
-
-## 2. Required feedback section (draft — fill from real experience)
-
-- **What we used:** Token Factory chat completions (OpenAI-compatible) with Nemotron 3.5 Lightning, Nemotron 3 Super (JSON mode) and Nemotron 3 Ultra; Tavily Search and Extract.
-- **Onboarding:** TODO — account creation, billing from India (card type, any charge), applying the hackathon code and the Builders Program code, time from sign-up to first successful call.
-- **What worked:** TODO (e.g. OpenAI SDK compatibility, latency per model, JSON mode reliability, cached tokens reported or not).
-- **What didn't:** TODO (e.g. model ids not discoverable without a key — the public `/v1/models` needs auth; no docs on Nemotron's reasoning on/off switch; JSON-mode support per model only visible on model cards).
-- **Would we build on it again:** TODO yes/no + why.
+**Limitations** — see the README section; they're real and published on purpose.
 
 ---
 
-## 3. Video script (≤ 3:00, TTS voiceover, screen recording only)
+## 2. Required feedback section
+
+- **What we used:** Token Factory chat completions (OpenAI-compatible) with Nemotron 3.5 Lightning, Nemotron 3 Super (JSON mode) and Nemotron 3 Ultra; also Nemotron 3.5 Super VL in our second entry. Tavily Search and Extract.
+- **Onboarding:** Sign-up with Google was quick. Billing needs a card even for credits; a Visa debit card from India worked (one OTP verification, no charge). The hackathon code `NEBIUS-DEVPOST-GLOBAL26` is rejected by the console's promo-code box ("Invalid promo code"): it's an activation code for a separate form on nebius.com, which emails the real code a few hours later. That cost us most of a night; a line on the Devpost page saying "this goes in the form, not the console" would fix it. Once applied, credits showed instantly.
+- **What worked:** Drop-in OpenAI compatibility; all four NVIDIA models listed under `/v1/models` with ids that matched the docs; JSON mode; request ids and token usage on every response; image input for Super VL with base64 data URLs. Latency with thinking off: Lightning 0.5–2 s, Super 1–6 s per page, Super VL ~5 s per page; Ultra with thinking 4–9 s.
+- **What didn't:** Reasoning is on by default and counts against `max_tokens`, so a 2,000-token budget returned no answer at all; we found `chat_template_kwargs: {"enable_thinking": false}` by testing, not in the docs (`/no_think` in the system prompt had no effect). Long calls occasionally dropped the connection ("fetch failed") around 60–75 s, so we added retries. Cached-token counts weren't reported for these models.
+- **Would we build on it again:** Yes. Cheap enough to serve students for free (about ₹1.5 a run), fast once thinking is tuned, and one API for text and vision.
+
+---
+
+## 3. Video script (≤ 3:00, screen recording only)
 
 | Time | Shot (screen) | Voiceover |
 |---|---|---|
-| 0:00–0:08 | Live app, ledger already showing Kavya's results; zoom on the marigold "closes in N days" row | "Kavya qualifies for a state scholarship that closes on Saturday. Nobody told her." |
-| 0:08–0:30 | Fresh page → tap **Kavya** → timeline lights up step by step; chips "Nemotron 3.5 Lightning", "Tavily Search", "Nemotron 3 Super" visible | "Unclaimed finds the scholarships an Indian student can still claim. One tap: Nemotron 3.5 Lightning on Nebius Token Factory plans the searches, Tavily searches government portals, Nemotron 3 Super reads every rule." |
-| 0:30–0:55 | Headline card (count, closing soon) → expand the BCW row: ✓ ticks with violet quote lines; the Kannada deadline quote | "Then code — not a model — checks each rule against her. Every tick shows the exact sentence it came from, even when the official page is in Kannada. If the model can't quote a rule, it's never trusted." |
-| 0:55–1:20 | Scroll to "What to do first" with the Ultra chip; the steps list | "Nemotron 3 Ultra ranks what's left and writes the week's plan: which certificate to start on today, which rule to confirm with the college." |
-| 1:20–1:35 | Click "Add deadlines to my calendar" → calendar shows the event with reminders | "Every open deadline goes into her calendar, with reminders." |
-| 1:35–2:05 | Student quote cards (text on screen, first name + year) | "We asked students at our college..." TODO real quotes. "The problem isn't that scholarships don't exist. It's that the rules are scattered, they change every year, and the dates differ by department." |
-| 2:05–2:30 | Show "Show N that don't fit you, and why" (✗ year rule on Pragati); a "Secondary — confirm" flag; the old-cycle "check portal" flag | "It's honest about what it doesn't know: rules it can't verify, dates from last year's cycle, and pages from secondary sites are all flagged." |
-| 2:30–2:50 | Open the call log: model ids, request ids, tokens | "Every call is logged: Lightning, Super and Ultra on Nebius Token Factory, Tavily for search. About two cents a run." TODO measured |
+| 0:00–0:10 | Three browser tabs side by side: bcwd.karnataka.gov.in "31.08.2026", buddy4study "September 30, 2026", ssp.karnataka.gov.in notice "31/10/2026" | "One scholarship. Three websites. Three different last dates. Two of them say it's closed. It closes on Saturday." |
+| 0:10–0:35 | Unclaimed home → tap **Run it live** for Kavya (or a fresh custom run) → timeline lights up; chips Lightning, Tavily, Super | "Unclaimed finds the scholarships an Indian student can still claim. Nemotron 3.5 Lightning on Nebius Token Factory plans the searches, Tavily searches government portals, Nemotron 3 Super reads every rule — even in Kannada." |
+| 0:35–1:00 | Results: headline + stat boxes → the BCW row: "closes 31 Oct, 2 days left", "Last date extended…", yellow "buddy4study.com says 30 Sept…" | "Code merges what every page says about the same scheme, trusts the newest official notice, and tells you when a website has it wrong." |
+| 1:00–1:20 | Expand the BCW row: ✓ rules with quote lines; the Kannada deadline quote | "Code, not a model, checks each rule against her, and every tick shows the exact sentence it came from. If the model can't quote a rule, it's never trusted." |
+| 1:20–1:40 | Documents checklist → "What to do first" with the Ultra chip | "Nemotron 3 Ultra ranks what's left and writes the week's plan, and one checklist says which certificate to get first." |
+| 1:40–1:50 | Click "Add deadlines to my calendar" → event with reminders | "Every open deadline goes into her calendar." |
+| 1:50–2:15 | Student quote cards (text, first name + year) | TODO real quotes. |
+| 2:15–2:35 | Arjun (SC): BCW scheme ✗ "Only for OBC…", Social Welfare ✓; a "?" row with "To check:" | "It's honest about what it doesn't know: unverifiable rules, old dates and secondary sources are all flagged." |
+| 2:35–2:50 | Call log and the "Done in 36 s · ₹1.4" line | "Every call is logged with its request id. A full run costs about one and a half rupees." |
 | 2:50–3:00 | Title card: Unclaimed · URL · "Nebius Token Factory · NVIDIA Nemotron · Tavily" | "Unclaimed. The money is already there. Go claim it." |
 
-Recording notes: record at 1280×800, browser zoom 110%; run Kavya once before recording so the cache is warm, then record a fresh run (the timeline must be real). Do not cut away from a step that failed — re-record instead.
+Recording notes: 1280×800, browser zoom 110%. Show at least one **live** run (Run it live ↻); the recorded replays are fine for the other shots but say on screen "recorded run, 29 Oct". Re-record rather than cut away from a failed step. The "2 days left" wording changes with the recording date; record by 30 Oct.
 
 ---
 
 ## 4. Quotes and footage to collect (you)
 
-- 4–6 students: "Have you ever missed a scholarship? Why?" "How do you hear about them?" "Did you know BCW post-matric closes 31 Oct?" — text quotes, first name + year only, ask consent to use them.
-- 1 person from the college scholarship cell if reachable: how many students miss deadlines, what documents hold them up.
-- Screen recording of the real ssp.karnataka.gov.in home page (public page, for context in the video).
+- 4–6 students: "Have you ever missed a scholarship? Why?" "How do you hear about them?" "Did you know BCW post-matric closes 31 Oct?" Text quotes, first name + year only, with consent.
+- Screen recordings of the three public pages in the opening shot (bcwd, buddy4study, ssp notice board).
 - Do NOT record anyone's real marks card, income certificate or Aadhaar.
