@@ -16,11 +16,11 @@ What we found while building this, all on 28–29 Oct 2026, for one scheme (Karn
 
 | Source | Last date it gives |
 |---|---|
-| bcwd.karnataka.gov.in (the department's own page) | 31.08.2026 |
+| bcwd.karnataka.gov.in (the department's own page) | 31.08.2026 (updated to 31.10.2026 by 29 Oct) |
 | buddy4study.com (a popular scholarship site) | 30 Sep 2026 "(extended)" |
 | ssp.karnataka.gov.in (the portal where you apply), notice board, in Kannada | **31/10/2026** |
 
-A student reading either of the first two would think it had already closed. It closes on Saturday.
+A student reading either of the first two on 28 Oct would have thought it had already closed. It closes on Saturday. The department page caught up a day later; Buddy4Study still says 30 Sept. Pages that lag behind the official date is exactly what the agent checks for.
 
 The money is there and going unclaimed. Government figures given in Parliament show ₹9,163.98 crore allocated for scholarships for SC, OBC, EBC and DNT students in 2024-25, while post-matric beneficiaries fell from 45.45 lakh to about 24.5 lakh over four years ([The Wire, 12 Mar 2026](https://m.thewire.in/article/caste/funds-for-scholarships-for-students-from-marginalised-communities-underutilised-govt-data-shows-2)). There are many reasons; scattered, shifting, contradictory information is one a student can't fix alone.
 
