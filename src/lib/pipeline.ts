@@ -184,7 +184,7 @@ export async function runPipeline(profile: Profile, emit: Emit): Promise<void> {
     emit({ type: "error", message: "None of the pages could be read. Official portals sometimes block reading; try again later." });
     return;
   }
-  emit({ type: "step", step: "extract", status: "done", actor: "Tavily Extract", detail: `${pages.length} of ${chosen.length} pages had scholarship text` });
+  emit({ type: "step", step: "extract", status: "done", actor: "Tavily Extract", detail: `${pages.length} of ${Math.max(chosen.length, pages.length)} pages had scholarship text` });
 
   // 4. Read
   emit({ type: "step", step: "read", status: "running", actor: labelOf(MODELS.super) });
