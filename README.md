@@ -22,7 +22,7 @@ What we found while building this, all on 28–29 Oct 2026, for one scheme (Karn
 
 A student reading either of the first two would think it had already closed. It closes on Saturday.
 
-<!-- TODO: add 2-3 real student quotes (first name + year only, with consent) -->
+The money is there and going unclaimed. Government figures given in Parliament show ₹9,163.98 crore allocated for scholarships for SC, OBC, EBC and DNT students in 2024-25, while post-matric beneficiaries fell from 45.45 lakh to about 24.5 lakh over four years ([The Wire, 12 Mar 2026](https://m.thewire.in/article/caste/funds-for-scholarships-for-students-from-marginalised-communities-underutilised-govt-data-shows-2)). There are many reasons; scattered, shifting, contradictory information is one a student can't fix alone.
 
 ## What it does
 
