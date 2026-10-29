@@ -48,3 +48,6 @@ next-env.d.ts
 
 # third-party page text used only for local evaluation
 /eval/pages
+
+# local Claude Code launch configs
+/.claude
