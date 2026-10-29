@@ -85,7 +85,8 @@ Rules:
 8. Only include scholarships the student could plausibly be eligible for: college-level (skip school-only), their state or all-India. At most 6. If the page has none, return {"scholarships": []}.
 9. Rules you cannot quote go in "other" with the closest quote, or are left out. Do not invent anything.
 10. Pages may be partly in Kannada or another Indian language. Read them, write names and reasons in English, but copy each quote exactly in the page's original language and script. Known Karnataka departments: Social Welfare (SC), Tribal Welfare (ST), Backward Classes Welfare (OBC), Minorities Welfare, Technical Education.
-11. A notice that applications "for the year 2024-25" closed on some date is an old cycle: set cycle "2024-25".`;
+11. A notice that applications "for the year 2024-25" closed on some date is an old cycle: set cycle "2024-25".
+12. A state scholarship portal page that only lists last dates by department (often in Kannada, e.g. "ಹಿಂದುಳಿದ ಕಲ್ಯಾಣ ಇಲಾಖೆಯ ಮೆಟ್ರಿಕ್ ನಂತರದ ವಿದ್ಯಾರ್ಥಿವೇತನಕ್ಕೆ ಅರ್ಜಿ ಸಲ್ಲಿಸಲು ಕೊನೆಯ ದಿನಾಂಕ: 31/10/2026"): output one entry per department relevant to the student, named "Post-Matric Scholarship (<Department> Department)" in English, provider the department, the date and its exact quote, cycle from the nearest year heading, and criteria [] if the page states none. Use only the section for the current cycle.`;
 
 export function readerUser(p: Profile, url: string, text: string): string {
   return `Student (only to judge relevance, not eligibility):\n${describeProfile(p)}\n\nSource URL: ${url}\n\nPage text:\n"""\n${text}\n"""`;

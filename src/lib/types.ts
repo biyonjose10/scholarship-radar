@@ -85,6 +85,7 @@ export interface CheckedScholarship {
   flags: string[]; // verifier warnings, shown to the student
   conflicts?: Conflict[]; // official vs secondary disagreements, official wins
   followUp?: { url: string; settled: number }; // a second, official-only search settled this many rules
+  extendedFrom?: string; // ISO date an older official page still shows; the newer official date is used
 }
 
 // Events streamed from the server to the timeline.

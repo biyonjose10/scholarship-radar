@@ -629,6 +629,12 @@ function Ledger({ list, plan, judging }: { list: CheckedScholarship[]; plan: Pla
                         Settled {c.followUp.settled} rule{c.followUp.settled === 1 ? "" : "s"} with a second search of government sites
                       </span>
                     )}
+                    {c.extendedFrom && (
+                      <span className="mt-1 block text-xs text-rupee">
+                        Last date extended. An older official page still says{" "}
+                        {new Date(c.extendedFrom + "T00:00:00Z").toLocaleDateString("en-IN", { day: "numeric", month: "short", year: "numeric", timeZone: "UTC" })}.
+                      </span>
+                    )}
                     {c.conflicts?.map((x, i) => (
                       <span key={i} className="mt-1 block bg-marigold/20 px-1.5 py-0.5 text-xs">
                         {x.secondaryHost} says {x.field === "deadline" ? "the last date is" : "the income limit is"} <b>{x.secondary}</b>; the official

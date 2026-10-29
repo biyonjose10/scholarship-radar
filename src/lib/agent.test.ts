@@ -175,3 +175,118 @@ test("criteria shaper maps model spellings and never lets an unknown value exclu
   const page = "q is a placeholder quote text that is long enough";
   assert.notEqual(checkScholarship(kavya, { ...s, criteria: [{ ...out[0], quote: "q is a placeholder quote" }] }, page, TODAY).eligibility, "not_eligible");
 });
+
+test("merge: one scheme under three names; the newest official date wins and the older one is noted", async () => {
+  const { mergeCopies, schemeKey } = await import("./merge");
+  const dept: Scholarship = {
+    ...official,
+    name: "Post Matric Scholarship",
+    provider: "Backward Classes Welfare Department, Government of Karnataka",
+    deadline: { date: "2026-08-31", text: "", quote: "Last date to apply: 31.08.2026" },
+    cycle: "2026-27",
+    sourceUrl: "https://bcwd.karnataka.gov.in/163",
+  };
+  const portal: Scholarship = {
+    ...official,
+    name: "Post-Matric Scholarship (Backward Classes Welfare Department)",
+    provider: "Backward Classes Welfare Department",
+    criteria: [],
+    deadline: { date: "2026-10-31", text: "", quote: "ಹಿಂದುಳಿದ ಕಲ್ಯಾಣ ಇಲಾಖೆಯ ಮೆಟ್ರಿಕ್ ನಂತರದ ವಿದ್ಯಾರ್ಥಿವೇತನಕ್ಕೆ ಅರ್ಜಿ ಸಲ್ಲಿಸಲು ಕೊನೆಯ ದಿನಾಂಕ: 31/10/2026" },
+    cycle: "2026-27",
+    sourceUrl: "https://ssp.karnataka.gov.in/ssp_post_home",
+  };
+  const site: Scholarship = { ...aggregator, name: "Post-Matric Scholarship for Backward Classes", provider: "" };
+  assert.equal(schemeKey(dept), "post-bc");
+  assert.equal(schemeKey(portal), "post-bc");
+  assert.equal(schemeKey(site), "post-bc");
+  assert.notEqual(schemeKey({ name: "Vidyasiri Scholarship", provider: "Backward Classes Welfare" }), "post-bc");
+
+  const texts = new Map([
+    [dept.sourceUrl, `${OFFICIAL_PAGE}\nLast date to apply: 31.08.2026`],
+    [portal.sourceUrl, "## Financial Year: 2026-27\nಹಿಂದುಳಿದ ಕಲ್ಯಾಣ ಇಲಾಖೆಯ ಮೆಟ್ರಿಕ್ ನಂತರದ ವಿದ್ಯಾರ್ಥಿವೇತನಕ್ಕೆ ಅರ್ಜಿ ಸಲ್ಲಿಸಲು ಕೊನೆಯ ದಿನಾಂಕ: 31/10/2026"],
+    [site.sourceUrl, AGG_PAGE],
+  ]);
+  const m = mergeCopies([site, dept, portal], texts);
+  assert.equal(m.base.sourceUrl, dept.sourceUrl); // rules from the department page
+  assert.equal(m.base.deadline.date, "2026-10-31"); // date from the portal
+  assert.equal(m.extendedFrom, "2026-08-31");
+  const c = checkScholarship(kavya, m.base, m.text, TODAY);
+  assert.equal(c.deadlineStatus, "closing_soon"); // quote verified against the portal text
+  assert.equal(c.daysLeft, 3);
+  // The secondary site's 31 Dec is flagged against the official 31 Oct.
+  const conflicts = findConflicts(m.base, [site, dept, portal], new Map([...texts].map(([u, t]) => [u, normalize(t)]).concat([[m.base.sourceUrl, m.norm]]) as [string, string][]));
+  assert.ok(conflicts.some((x) => x.field === "deadline" && /31 Oct 2026/.test(x.official)));
+});
+
+test("merge: an official date-only notice borrows quoted rules from a secondary copy, and says so", async () => {
+  const { mergeCopies } = await import("./merge");
+  const portal: Scholarship = {
+    ...official,
+    name: "Post-Matric Scholarship (Backward Classes Welfare Department)",
+    criteria: [],
+    deadline: { date: "2026-10-31", text: "", quote: "ಕೊನೆಯ ದಿನಾಂಕ: 31/10/2026 ಹಿಂದುಳಿದ ಕಲ್ಯಾಣ" },
+    sourceUrl: "https://ssp.karnataka.gov.in/ssp_post_home",
+  };
+  const site: Scholarship = {
+    ...aggregator,
+    name: "Post-Matric Scholarship for Backward Classes",
+    criteria: [{ kind: "income_max", value: 100000, forCategories: ["2A", "3A", "3B"], quote: "Family income up to ₹1 lakh for Categories 2A, 3A and 3B" }],
+  };
+  const texts = new Map([
+    [portal.sourceUrl, "ಕೊನೆಯ ದಿನಾಂಕ: 31/10/2026 ಹಿಂದುಳಿದ ಕಲ್ಯಾಣ"],
+    [site.sourceUrl, "Family income up to ₹1 lakh for Categories 2A, 3A and 3B. Last date to apply: December 31, 2026."],
+  ]);
+  const m = mergeCopies([portal, site], texts);
+  assert.equal(m.base.sourceKind, "official");
+  assert.equal(m.base.deadline.date, "2026-10-31");
+  assert.equal(m.base.criteria.length, 2); // the borrowed income rule + "for backward classes" from the notice
+  assert.equal(m.rulesFrom, "buddy4study.com");
+  const c = checkScholarship(kavya, m.base, m.text, TODAY);
+  assert.equal(c.eligibility, "eligible"); // ₹95,000 within the quoted ₹1 lakh for 2A
+  assert.equal(c.deadlineStatus, "closing_soon");
+});
+
+test("merge: a date-only notice that names its department becomes a quoted category rule", async () => {
+  const { mergeCopies } = await import("./merge");
+  const { PERSONAS } = await import("./personas");
+  const arjun = PERSONAS[1]; // SC
+  const quote = "ಹಿಂದುಳಿದ ಕಲ್ಯಾಣ ಇಲಾಖೆಯ ಮೆಟ್ರಿಕ್ ನಂತರದ ವಿದ್ಯಾರ್ಥಿವೇತನಕ್ಕೆ ಅರ್ಜಿ ಸಲ್ಲಿಸಲು ಕೊನೆಯ ದಿನಾಂಕ: 31/10/2026";
+  const portal: Scholarship = {
+    ...official,
+    name: "Post-Matric Scholarship (Backward Classes Welfare Department)",
+    criteria: [],
+    deadline: { date: "2026-10-31", text: "", quote },
+    sourceUrl: "https://ssp.karnataka.gov.in/ssp_post_home",
+  };
+  const m = mergeCopies([portal], new Map([[portal.sourceUrl, quote]]));
+  assert.equal(m.base.criteria[0].kind, "categories");
+  assert.equal(checkScholarship(arjun, m.base, m.text, TODAY).eligibility, "not_eligible");
+  assert.equal(checkScholarship(kavya, m.base, m.text, TODAY).eligibility, "eligible");
+});
+
+test("SSP notice board: only this year's section, every department, exact quotes", async () => {
+  const { parseSspNotices } = await import("./notices");
+  const page = [
+    "2024-25ನೇ ಸಾಲಿಗೆ ಸಮಾಜ ಕಲ್ಯಾಣ ಇಲಾಖೆಯ ಮೆಟ್ರಿಕ್ ನಂತರದ ವಿದ್ಯಾರ್ಧಿವೇತನಕ್ಕೆ ಅರ್ಜಿ ಸಲ್ಲಿಸಲು ಕೊನೆಯ ದಿನಾಂಕ: 10/07/2025.",
+    "## Financial Year: 2026-27",
+    "![](Images/new.gif)",
+    "ಸಮಾಜ ಕಲ್ಯಾಣ ಇಲಾಖೆಯ ಮೆಟ್ರಿಕ್ ನಂತರದ ವಿದ್ಯಾರ್ಥಿವೇತನಕ್ಕೆ ಅರ್ಜಿ ಸಲ್ಲಿಸಲು ಕೊನೆಯ ದಿನಾಂಕ: 31/01/2027",
+    "ಹಿಂದುಳಿದ ಕಲ್ಯಾಣ ಇಲಾಖೆಯ ಮೆಟ್ರಿಕ್ ನಂತರದ ವಿದ್ಯಾರ್ಥಿವೇತನಕ್ಕೆ ಅರ್ಜಿ ಸಲ್ಲಿಸಲು ಕೊನೆಯ ದಿನಾಂಕ: 31/10/2026",
+    "ಅಲ್ಪಸಂಖ್ಯಾತರ ಕಲ್ಯಾಣ ಇಲಾಖೆಯ ಮೆಟ್ರಿಕ್ ನಂತರದ ವಿದ್ಯಾರ್ಥಿವೇತನಕ್ಕೆ ಅರ್ಜಿ ಸಲ್ಲಿಸಲು ಕೊನೆಯ ದಿನಾಂಕ: 30/11/2026",
+    "## Financial Year: 2025-26",
+    "ಹಿಂದುಳಿದ ಕಲ್ಯಾಣ ಇಲಾಖೆಯ ಮೆಟ್ರಿಕ್ ನಂತರದ ವಿದ್ಯಾರ್ಥಿವೇತನಕ್ಕೆ ಅರ್ಜಿ ಸಲ್ಲಿಸಲು ಕೊನೆಯ ದಿನಾಂಕ: 16/05/2026",
+  ].join("\n");
+  const got = parseSspNotices(page, "https://ssp.karnataka.gov.in/ssp_post_home");
+  assert.deepEqual(got.map((s) => [s.provider, s.deadline.date, s.cycle]), [
+    ["Social Welfare Department", "2027-01-31", "2026-27"],
+    ["Backward Classes Welfare Department", "2026-10-31", "2026-27"],
+    ["Minorities Welfare Department", "2026-11-30", "2026-27"],
+  ]);
+  const { schemeKey, mergeCopies } = await import("./merge");
+  const bc = got[1];
+  assert.equal(schemeKey(bc), "post-bc");
+  const m = mergeCopies([bc], new Map([[bc.sourceUrl, page]]));
+  const c = checkScholarship(kavya, m.base, m.text, TODAY);
+  assert.equal(c.eligibility, "eligible");
+  assert.equal(c.deadlineStatus, "closing_soon");
+});

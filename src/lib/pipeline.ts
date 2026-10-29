@@ -1,17 +1,20 @@
 // The agent run: Scout -> Search -> Extract -> Read -> Check -> Verify -> Follow up -> Judge -> Act.
 // Each step reports which model or tool did the work, so the timeline can show it.
 import type { CheckedScholarship, ModelCall, Plan, Profile, RunEvent, Scholarship, SourceKind, StepId, ToolCall } from "./types";
-import { search, extract, rankSources, OFFICIAL_DOMAINS, type ExtractedPage, type SearchHit } from "./tavily";
+import { search, extract, rankSources, OFFICIAL_DOMAINS, STATE_NOTICE_PAGES, STATE_PORTALS, type ExtractedPage, type SearchHit } from "./tavily";
 import { chatJson, labelOf, MODELS } from "./nebius";
-import { focusText, normalize, quoteInText, signalScore } from "./text";
+import { focusText, normalize, signalScore } from "./text";
 import { baseOrder, checkScholarship } from "./checker";
 import { findConflicts } from "./conflicts";
 import { followUpQuery, mergeFollowUp, pickFollowUps, unsettled } from "./followup";
 import { cacheGet, cacheSet, hash } from "./cache";
 import { cleanCriteria } from "./shape";
+import { mergeCopies, schemeKey } from "./merge";
+import { parseSspNotices } from "./notices";
 import { describeProfile, fallbackQueries, JUDGE_SYSTEM, judgeUser, READER_SYSTEM, readerUser, SCOUT_SYSTEM, scoutUser } from "./prompts";
 
 const MAX_PAGES = 7;
+const CYCLE = "2026-27";
 const MAX_OFFICIAL_PAGES = 4;
 const READ_CONCURRENCY = 4;
 const MAX_JUDGE_CANDIDATES = 10;
@@ -42,19 +45,6 @@ function slug(s: string): string {
   return s.toLowerCase().replace(/[^a-z0-9]+/g, "-").replace(/^-|-$/g, "").slice(0, 60);
 }
 
-// Same scheme found on two pages: keep the copy from the better source with more verifiable rules.
-export function nameKey(name: string): string {
-  return normalize(name)
-    .replace(/\b(scholarship|scheme|programme|program|for|the|of|and|20\d\d(-\d\d)?)\b/g, " ")
-    .replace(/[^a-z0-9]+/g, " ")
-    .trim();
-}
-
-const KIND_RANK: Record<SourceKind, number> = { official: 0, foundation: 1, aggregator: 2, other: 3 };
-
-function verifiedRules(s: Scholarship, pageNorm: string): number {
-  return s.criteria.filter((c) => quoteInText(c.quote, pageNorm)).length;
-}
 
 
 type Period = Scholarship["amount"]["period"];
@@ -98,6 +88,7 @@ async function readPage(profile: Profile, page: ExtractedPage, kind: SourceKind,
   try {
     const out = await chatJson<{ scholarships?: Partial<Scholarship>[] }>({
       model: MODELS.super,
+      thinking: false, // copying text out, not reasoning
       step,
       system: READER_SYSTEM,
       user: readerUser(profile, page.url, focusText(page.text)),
@@ -136,6 +127,7 @@ export async function runPipeline(profile: Profile, emit: Emit): Promise<void> {
   try {
     plan = await chatJson<{ queries: string[]; official: string[] }>({
       model: MODELS.lightning,
+      thinking: false, // copying text out, not reasoning
       step: "scout",
       system: SCOUT_SYSTEM,
       user: scoutUser(profile),
@@ -158,6 +150,10 @@ export async function runPipeline(profile: Profile, emit: Emit): Promise<void> {
     await Promise.all([
       ...plan.queries.map((q) => search(q, "search", onTool)),
       ...plan.official.map((q) => search(q, "search", onTool, { includeDomains: OFFICIAL_DOMAINS, maxResults: 5 })),
+      // The state portal where students apply carries the current, extended last dates.
+      ...(STATE_PORTALS[profile.state]
+        ? [search(`post matric scholarship last date ${CYCLE} department wise`, "search", onTool, { includeDomains: [STATE_PORTALS[profile.state]], maxResults: 2 })]
+        : []),
     ])
   ).flat();
   const ranked = rankSources(hits, profile.state);
@@ -165,6 +161,10 @@ export async function runPipeline(profile: Profile, emit: Emit): Promise<void> {
     emit({ type: "step", step: "search", status: "failed", actor: "Tavily Search", detail: "No results" });
     emit({ type: "error", message: "The web search returned nothing. Try again in a minute." });
     return;
+  }
+  const notice = STATE_NOTICE_PAGES[profile.state];
+  if (notice && !ranked.some((h) => h.url.replace(/\/$/, "") === notice)) {
+    ranked.unshift({ url: notice, title: `${profile.state} scholarship portal: notices and last dates`, content: "", score: 1, kind: "official" });
   }
   const official = ranked.filter((h) => h.kind === "official").slice(0, MAX_OFFICIAL_PAGES);
   const rest = ranked.filter((h) => h.kind !== "official").slice(0, MAX_PAGES - official.length);
@@ -175,6 +175,10 @@ export async function runPipeline(profile: Profile, emit: Emit): Promise<void> {
   // 3. Extract
   emit({ type: "step", step: "extract", status: "running", actor: "Tavily Extract" });
   const pages = (await extractCached(chosen.map((h) => h.url), "extract", onTool)).filter((p) => signalScore(p.text) >= 5);
+  // The notice board carries this year's official dates; if it didn't come back, try it once more alone.
+  if (notice && !pages.some((p) => p.url.replace(/\/$/, "") === notice)) {
+    pages.push(...(await extractCached([notice], "extract", onTool)));
+  }
   if (pages.length === 0) {
     emit({ type: "step", step: "extract", status: "failed", actor: "Tavily Extract", detail: "No readable pages" });
     emit({ type: "error", message: "None of the pages could be read. Official portals sometimes block reading; try again later." });
@@ -186,37 +190,52 @@ export async function runPipeline(profile: Profile, emit: Emit): Promise<void> {
   emit({ type: "step", step: "read", status: "running", actor: labelOf(MODELS.super) });
   const kindOf = new Map(chosen.map((h) => [h.url, h.kind]));
   const pageNorm = new Map(pages.map((p) => [p.url, normalize(p.text)]));
-  const read = await pool(pages, READ_CONCURRENCY, (page) => readPage(profile, page, kindOf.get(page.url) ?? "other", "read", onModel));
+  // The state portal's notice board has a fixed format; code reads it exactly (falls back to the model if it changes).
+  let fromNotices = 0;
+  const read = await pool(pages, READ_CONCURRENCY, async (page) => {
+    if (page.url.replace(/\/$/, "") === notice) {
+      const parsed = parseSspNotices(page.text, page.url);
+      fromNotices = parsed.length;
+      if (parsed.length) return parsed;
+    }
+    return readPage(profile, page, kindOf.get(page.url) ?? "other", "read", onModel);
+  });
   const found = read.flat();
-  emit({ type: "step", step: "read", status: found.length ? "done" : "failed", actor: labelOf(MODELS.super), detail: `${found.length} scholarships read from ${pages.length} pages` });
+  emit({
+    type: "step",
+    step: "read",
+    status: found.length ? "done" : "failed",
+    actor: labelOf(MODELS.super),
+    detail: `${found.length} scholarships read from ${pages.length} pages` + (fromNotices ? `; ${fromNotices} official last dates read from the portal notice board by code` : ""),
+  });
   if (found.length === 0) {
     emit({ type: "error", message: "No scholarship rules could be read from the pages found." });
     return;
   }
 
-  // Merge duplicates across pages, keeping every copy so official and secondary can be compared.
-  const byKey = new Map<string, Scholarship>();
-  const copies = new Map<string, Scholarship[]>();
+  // Group copies of the same scheme across pages (names differ; department and level don't),
+  // keeping every copy so official and secondary can be compared.
+  const groups = new Map<string, Scholarship[]>();
   for (const s of found) {
-    const key = nameKey(s.name) || slug(s.name);
-    copies.set(key, [...(copies.get(key) ?? []), s]);
-    const prev = byKey.get(key);
-    const better =
-      !prev ||
-      KIND_RANK[s.sourceKind] < KIND_RANK[prev.sourceKind] ||
-      (KIND_RANK[s.sourceKind] === KIND_RANK[prev.sourceKind] &&
-        verifiedRules(s, pageNorm.get(s.sourceUrl) ?? "") > verifiedRules(prev, pageNorm.get(prev.sourceUrl) ?? ""));
-    if (better) byKey.set(key, { ...s, id: slug(key) || slug(s.name) });
+    const key = schemeKey(s) || slug(s.name);
+    groups.set(key, [...(groups.get(key) ?? []), s]);
   }
 
   // 5. Check (code)
   emit({ type: "step", step: "check", status: "running", actor: "Rule checker (code, no model)" });
   const textByUrl = new Map(pages.map((p) => [p.url, p.text]));
-  let checked: CheckedScholarship[] = [...byKey.entries()]
-    .map(([key, s]) => {
-      const c = checkScholarship(profile, s, textByUrl.get(s.sourceUrl) ?? "", today);
-      const conflicts = findConflicts(s, copies.get(key) ?? [], pageNorm);
-      return conflicts.length ? { ...c, conflicts } : c;
+  const checkedText = new Map<string, string>(); // scheme id -> the page text its quotes were checked against
+  let checked: CheckedScholarship[] = [...groups.entries()]
+    .map(([key, copies]) => {
+      const m = mergeCopies(copies, textByUrl);
+      const s = { ...m.base, id: slug(key) || slug(m.base.name) };
+      const checkedNow = checkScholarship(profile, s, m.text, today);
+      const c = m.rulesFrom
+        ? { ...checkedNow, flags: [...checkedNow.flags, `Eligibility rules read from ${m.rulesFrom}; the official page lists only the date. Confirm them on the official portal.`] }
+        : checkedNow;
+      checkedText.set(s.id, m.text);
+      const conflicts = findConflicts(s, copies, new Map([...pageNorm, [s.sourceUrl, m.norm]]));
+      return { ...c, ...(conflicts.length ? { conflicts } : {}), ...(m.extendedFrom ? { extendedFrom: m.extendedFrom } : {}) };
     })
     .sort(baseOrder);
   const eligible = checked.filter((c) => c.eligibility === "eligible").length;
@@ -258,15 +277,15 @@ export async function runPipeline(profile: Profile, emit: Emit): Promise<void> {
         if (!next) return null;
         const [page] = (await extractCached([next.url], "followup", onTool)).filter((p) => signalScore(p.text) >= 3);
         if (!page) return null;
-        const want = nameKey(c.scholarship.name);
-        const match = (await readPage(profile, page, "official", "followup", onModel)).find((s) => nameKey(s.name) === want);
+        const want = schemeKey(c.scholarship);
+        const match = (await readPage(profile, page, "official", "followup", onModel)).find((s) => schemeKey(s) === want);
         if (!match) return null;
-        const origText = textByUrl.get(c.scholarship.sourceUrl) ?? "";
+        const origText = checkedText.get(c.scholarship.id) ?? textByUrl.get(c.scholarship.sourceUrl) ?? "";
         const merged = mergeFollowUp(c.scholarship, normalize(origText), match, normalize(page.text));
         const again = checkScholarship(profile, merged, `${origText}\n\n${page.text}`, today);
         const settled = unsettled(c) - unsettled(again);
         if (settled <= 0 && again.eligibility === c.eligibility) return null;
-        return { ...again, conflicts: c.conflicts, followUp: { url: page.url, settled: Math.max(settled, 0) } };
+        return { ...again, conflicts: c.conflicts, extendedFrom: c.extendedFrom, followUp: { url: page.url, settled: Math.max(settled, 0) } };
       }),
     );
     let settledTotal = 0;

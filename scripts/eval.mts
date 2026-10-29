@@ -26,6 +26,7 @@ for (const p of gold.pages) {
   const text = readFileSync(resolve(root, "pages", p.file), "utf8");
   const out = await chatJson<{ scholarships?: Scholarship[] }>({
     model: MODELS.super,
+    thinking: false, // copying text out, not reasoning
     step: "read",
     system: READER_SYSTEM,
     user: readerUser(profile, p.url, focusText(text)),

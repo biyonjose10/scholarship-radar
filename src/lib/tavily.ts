@@ -103,7 +103,7 @@ function otherState(url: string, state: string): boolean {
 export function rankSources(hits: SearchHit[], state: string): SearchHit[] {
   const seen = new Set<string>();
   const rank = (h: SearchHit): number => {
-    if (h.kind === "official") return mentionsState(h.url, state) ? 0 : 1;
+    if (h.kind === "official") return STATE_PORTALS[state] && hostOf(h.url) === STATE_PORTALS[state] ? -1 : mentionsState(h.url, state) ? 0 : 1;
     return { foundation: 2, aggregator: 3, other: 4 }[h.kind];
   };
   return hits
@@ -124,7 +124,21 @@ function apiKey(): string {
   return key;
 }
 
+// Many searches go out at once; a dropped connection ("fetch failed") or a 429/5xx is retried twice.
 async function post(path: string, body: unknown): Promise<{ status: number; json: Record<string, unknown> }> {
+  for (let attempt = 0; ; attempt++) {
+    try {
+      const r = await postOnce(path, body);
+      if ((r.status === 429 || r.status >= 500) && attempt < 2) throw new Error(`HTTP ${r.status}`);
+      return r;
+    } catch (e) {
+      if (attempt >= 2 || String(e).includes("TAVILY_API_KEY")) throw e;
+      await new Promise((res) => setTimeout(res, 1500 * (attempt + 1)));
+    }
+  }
+}
+
+async function postOnce(path: string, body: unknown): Promise<{ status: number; json: Record<string, unknown> }> {
   const res = await fetch(`${TAVILY}${path}`, {
     method: "POST",
     headers: { Authorization: `Bearer ${apiKey()}`, "Content-Type": "application/json" },
@@ -133,6 +147,20 @@ async function post(path: string, body: unknown): Promise<{ status: number; json
   const json = (await res.json().catch(() => ({}))) as Record<string, unknown>;
   return { status: res.status, json };
 }
+
+// The state scholarship portal where students apply. Its notices carry the current (often
+// extended) last dates, which department pages may not have caught up with.
+export const STATE_PORTALS: Record<string, string> = {
+  Karnataka: "ssp.karnataka.gov.in",
+  Maharashtra: "mahadbt.maharashtra.gov.in",
+  Bihar: "pmsonline.bih.nic.in",
+};
+
+// The portal page where those notices are posted, read on every run for that state so the
+// current dates never depend on what a search happens to return.
+export const STATE_NOTICE_PAGES: Record<string, string> = {
+  Karnataka: "https://ssp.karnataka.gov.in/ssp_post_home",
+};
 
 // Government sites only: these are the portals that publish the rules themselves.
 export const OFFICIAL_DOMAINS = ["gov.in", "nic.in"];

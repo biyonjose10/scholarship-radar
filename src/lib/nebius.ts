@@ -36,6 +36,9 @@ interface ChatOpts {
   maxTokens?: number;
   temperature?: number;
   json?: boolean;
+  // false switches off Nemotron's hidden reasoning (chat_template_kwargs.enable_thinking), for
+  // jobs that only copy text out: much faster and cheaper. Default: the model's own setting.
+  thinking?: boolean;
   onCall: (c: ModelCall) => void;
 }
 
@@ -62,7 +65,19 @@ export function parseJsonLoose<T>(s: string): T {
   }
 }
 
+// Connection drops ("fetch failed") happen on long calls; try twice more before giving up.
 async function post(body: Record<string, unknown>): Promise<{ status: number; json: ChatResponse & { error?: unknown }; text: string }> {
+  for (let attempt = 0; ; attempt++) {
+    try {
+      return await postOnce(body);
+    } catch (e) {
+      if (attempt >= 2 || String(e).includes("NEBIUS_API_KEY")) throw e;
+      await new Promise((res) => setTimeout(res, 2000 * (attempt + 1)));
+    }
+  }
+}
+
+async function postOnce(body: Record<string, unknown>): Promise<{ status: number; json: ChatResponse & { error?: unknown }; text: string }> {
   const key = process.env.NEBIUS_API_KEY;
   if (!key) throw new Error("NEBIUS_API_KEY is not set");
   const res = await fetch(`${BASE}/chat/completions`, {
@@ -92,11 +107,15 @@ export async function chat(o: ChatOpts): Promise<string> {
     temperature: o.temperature ?? 0.2,
   };
   if (o.json) body.response_format = { type: "json_object" };
+  if (o.thinking === false) body.chat_template_kwargs = { enable_thinking: false };
 
   try {
     let r = await post(body);
     for (let attempt = 0; attempt < 3; attempt++) {
-      if (r.status === 400 && body.response_format) {
+      if (r.status === 400 && body.chat_template_kwargs) {
+        // Model without the thinking switch: retry with its default.
+        delete body.chat_template_kwargs;
+      } else if (r.status === 400 && body.response_format) {
         // Model without JSON mode: retry once with the instruction in the prompt only.
         delete body.response_format;
       } else if (r.status === 429 || r.status >= 500) {
