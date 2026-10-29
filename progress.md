@@ -60,3 +60,16 @@ Evidence (fixture mode, no API calls): Kavya run shows all of the above; 375 px 
   `scripts/eval.mts`. NOT run yet (needs the key). Pages are gitignored (third-party text).
 Evidence: `npm test` 18/18; fixture Kavya run shows the conflict line, checklist, follow-up step; replay banner and
 recorded duration shown; Arjun without a recording gets "not configured" (no call made).
+
+## 2026-10-29 ~10:30 IST — first real Token Factory runs (key in, $29.50 credit)
+- Smoke: all four model ids match. Lightning spent its whole 2,000-token budget thinking on the Scout; Super reads took
+  25-60 s with up to 5k reasoning tokens. Fix: chat_template_kwargs.enable_thinking=false for Scout and Reader (tested:
+  0 reasoning tokens), kept for Ultra. Retries for "fetch failed" on Nebius and Tavily. Runs went 182 s -> 26-75 s.
+- Real data problem: BCW post-matric 2026-27 has three dates: bcwd page 31.08.2026, Buddy4Study 30 Sep "(extended)",
+  SSP portal notice board 31/10/2026. Fixes: the SSP notice board is always read and parsed in code (`notices.ts`;
+  the model kept taking last year's lines), copies of a scheme are grouped by level+department (`merge.ts`), the newest
+  quoted official date wins with "extended" noted, date-only notices borrow quoted rules and get a department rule from
+  the quoted notice. 23/23 tests.
+- Evidence: live POST to unclaimed-nine.vercel.app ran all 9 steps (7 eligible, 40/41 rules verified, 1 conflict).
+  Recordings saved for Kavya, Arjun, Sana (src/data/recorded). Kavya: BCW post-matric official, eligible, closes 31 Oct,
+  Buddy4Study conflict 30 Sept, extended from 31 Aug. Cost per run ~$0.015-0.02. Balance after all testing: $29.22.
